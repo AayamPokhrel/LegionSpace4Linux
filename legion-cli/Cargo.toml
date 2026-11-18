@@ -1,6 +1,6 @@
 [package]
 name = "legion-cli"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 authors = ["AayamPokhrel <pokhrelaayam1010@gmail.com>"]
 description = "Native Linux userspace driver and CLI utility for Lenovo Legion laptops"
