@@ -1,6 +1,6 @@
 use crate::cli::*;
 use crate::error::{LegionError, Result};
-use crate::hardware::{battery, custom_mode, fan, lighting, probe, thermal};
+use crate::hardware::{battery, custom_mode, fan, gpu, lighting, probe, thermal};
 use crate::status;
 use colored::*;
 use serde::Serialize;
@@ -62,6 +62,7 @@ fn dispatch(cli: &Cli) -> Result<()> {
         Some(Commands::Fan(cmd)) => handle_fan(cmd, cli.json),
         Some(Commands::Battery(cmd)) => handle_battery(cmd, cli.json),
         Some(Commands::Custom(cmd)) => handle_custom(cmd, cli.json),
+        Some(Commands::Gpu(cmd)) => handle_gpu(cmd, cli.json),
         Some(Commands::Lighting(cmd)) => handle_lighting(cmd, cli.json),
     }
 }
@@ -396,8 +397,13 @@ fn handle_custom(cmd: &CustomCmd, json: bool) -> Result<()> {
             pl1,
             pl2,
             pl3,
+            cpu_cl,
             cpu_temp,
             gpu_temp,
+            nv_offset,
+            ctgp,
+            ppab,
+            cpu_boost,
             tgp_offset,
         }) => {
             let mut changes = Vec::new();
@@ -418,6 +424,10 @@ fn handle_custom(cmd: &CustomCmd, json: bool) -> Result<()> {
                 custom_mode::set_firmware_attribute("ppt_pl3_fppt", *v)?;
                 changes.push(format!("ppt_pl3_fppt = {} W", v));
             }
+            if let Some(v) = cpu_cl {
+                custom_mode::set_firmware_attribute("ppt_cpu_cl", *v)?;
+                changes.push(format!("ppt_cpu_cl = {} W", v));
+            }
             if let Some(v) = cpu_temp {
                 custom_mode::set_firmware_attribute("cpu_temp", *v)?;
                 changes.push(format!("cpu_temp = {} °C", v));
@@ -426,14 +436,26 @@ fn handle_custom(cmd: &CustomCmd, json: bool) -> Result<()> {
                 custom_mode::set_firmware_attribute("gpu_temp", *v)?;
                 changes.push(format!("gpu_temp = {} °C", v));
             }
-            if let Some(v) = tgp_offset {
-                custom_mode::set_firmware_attribute("gpu_nv_ac_offset", *v)?;
+            if let Some(v) = nv_offset.or(*tgp_offset) {
+                custom_mode::set_firmware_attribute("gpu_nv_ac_offset", v)?;
                 changes.push(format!("gpu_nv_ac_offset = {} W", v));
+            }
+            if let Some(v) = ctgp {
+                custom_mode::set_firmware_attribute("gpu_nv_ctgp", *v)?;
+                changes.push(format!("gpu_nv_ctgp = {} W", v));
+            }
+            if let Some(v) = ppab {
+                custom_mode::set_firmware_attribute("gpu_nv_ppab", *v)?;
+                changes.push(format!("gpu_nv_ppab = {} W", v));
+            }
+            if let Some(v) = cpu_boost {
+                custom_mode::set_firmware_attribute("gpu_nv_cpu_boost", *v)?;
+                changes.push(format!("gpu_nv_cpu_boost = {} W", v));
             }
 
             if changes.is_empty() {
                 return Err(LegionError::InvalidValue(
-                    "No attribute options provided. Use --name and --value, or --pl1, --pl2, --cpu-temp, etc."
+                    "No attribute options provided. Use --name and --value, or --pl1, --pl2, --ctgp, --ppab, etc."
                         .into(),
                 ));
             }
@@ -451,6 +473,95 @@ fn handle_custom(cmd: &CustomCmd, json: bool) -> Result<()> {
                 for change in changes {
                     println!("  {}", change.cyan());
                 }
+            }
+        }
+    }
+    Ok(())
+}
+
+// ----------------------------------------------------------------------------
+// GPU Handlers
+// ----------------------------------------------------------------------------
+fn handle_gpu(cmd: &GpuCmd, json: bool) -> Result<()> {
+    match &cmd.action {
+        None | Some(GpuAction::Status) => {
+            let telem = gpu::get_gpu_telemetry()?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&telem).unwrap());
+            } else {
+                println!("{}", "NVIDIA Discrete GPU Status:".cyan().bold());
+                if !telem.available {
+                    println!("  GPU is currently unavailable or powered down.");
+                } else {
+                    println!("  Model:              {}", telem.name.green().bold());
+                    println!("  VBIOS Version:      {}", telem.vbios_version);
+                    println!("  Driver Version:     {}", telem.driver_version);
+                    println!(
+                        "  Temperature:        {} °C (Ceiling: {} °C)",
+                        telem.current_temp_c, telem.target_temp_c
+                    );
+                    println!(
+                        "  Power Draw:         {:.2} W (TGP Limit: {:.1} W, Max: {:.1} W)",
+                        telem.power_draw_w, telem.power_limit_w, telem.max_power_limit_w
+                    );
+                    println!(
+                        "  Graphics Clock:     {} MHz (Max: {} MHz)",
+                        telem.graphics_clock_mhz, telem.max_graphics_clock_mhz
+                    );
+                    println!("  Memory Clock:       {} MHz", telem.memory_clock_mhz);
+                    println!(
+                        "  VRAM Memory:        {} MiB / {} MiB ({:.1}% used)",
+                        telem.vram_used_mib,
+                        telem.vram_total_mib,
+                        (telem.vram_used_mib as f64 / telem.vram_total_mib.max(1) as f64) * 100.0
+                    );
+                    if let Some(c) = telem.nv_ctgp_w {
+                        println!("  Configurable TGP:   {} W", c);
+                    }
+                    if let Some(p) = telem.nv_ppab_w {
+                        println!("  Dynamic Boost:      {} W", p);
+                    }
+                    if let Some(o) = telem.nv_ac_offset_w {
+                        println!("  AC Baseline Offset: {} W", o);
+                    }
+                }
+            }
+        }
+        Some(GpuAction::Set {
+            power_limit,
+            gpu_temp,
+            ac_offset,
+            ctgp,
+            ppab,
+            cpu_boost,
+        }) => {
+            gpu::set_gpu_tuning_settings(*power_limit, *gpu_temp, *ac_offset, *ctgp, *ppab, *cpu_boost)?;
+            let telem = gpu::get_gpu_telemetry()?;
+            if json {
+                let resp = ActionResponse {
+                    success: true,
+                    action: "gpu_tuning_set",
+                    data: &telem,
+                };
+                println!("{}", serde_json::to_string_pretty(&resp).unwrap());
+            } else {
+                println!("{} Updated GPU tuning parameters successfully.", "[OK]".green().bold());
+            }
+        }
+        Some(GpuAction::LockClocks { min, max }) => {
+            gpu::lock_gpu_clocks(*min, *max)?;
+            if json {
+                println!("{}", serde_json::json!({"success": true, "locked_clocks": [min, max]}));
+            } else {
+                println!("{} Locked GPU clocks to {}-{} MHz.", "[OK]".green().bold(), min, max);
+            }
+        }
+        Some(GpuAction::ResetClocks) => {
+            gpu::reset_gpu_clocks()?;
+            if json {
+                println!("{}", serde_json::json!({"success": true, "reset_clocks": true}));
+            } else {
+                println!("{} Reset GPU clocks to automatic management.", "[OK]".green().bold());
             }
         }
     }

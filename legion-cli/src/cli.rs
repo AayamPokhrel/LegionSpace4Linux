@@ -47,6 +47,9 @@ pub enum Commands {
     #[command(about = "Fine-tune custom mode firmware power limits and temperature thresholds")]
     Custom(CustomCmd),
 
+    #[command(about = "Manage NVIDIA discrete GPU telemetry, TGP limits, and clocks")]
+    Gpu(GpuCmd),
+
     #[command(
         alias = "rgb",
         about = "Control 4-zone RGB lighting, ACPI backlight, and Fn-Lock"
@@ -183,15 +186,77 @@ pub enum CustomAction {
         #[arg(long, help = "CPU Fast Peak Power Limit PL3 / FPPT (Watts)")]
         pl3: Option<i64>,
 
+        #[arg(long, help = "CPU Cross Loading Power Limit (Watts)")]
+        cpu_cl: Option<i64>,
+
         #[arg(long, help = "CPU Temperature Limit (°C)")]
         cpu_temp: Option<i64>,
 
         #[arg(long, help = "GPU Temperature Limit (°C)")]
         gpu_temp: Option<i64>,
 
-        #[arg(long, help = "GPU TGP Offset (Watts)")]
+        #[arg(long, help = "GPU AC processing power baseline offset (Watts)")]
+        nv_offset: Option<i64>,
+
+        #[arg(long, help = "GPU Configurable TGP (Watts)")]
+        ctgp: Option<i64>,
+
+        #[arg(long, help = "GPU Dynamic Boost (PPAB) limit (Watts)")]
+        ppab: Option<i64>,
+
+        #[arg(long, help = "GPU to CPU Dynamic Boost limit (Watts)")]
+        cpu_boost: Option<i64>,
+
+        #[arg(long, help = "Legacy alias for nv_offset (Watts)")]
         tgp_offset: Option<i64>,
     },
+}
+
+// ----------------------------------------------------------------------------
+// GPU Subcommands
+// ----------------------------------------------------------------------------
+#[derive(Args, Debug)]
+pub struct GpuCmd {
+    #[command(subcommand)]
+    pub action: Option<GpuAction>,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum GpuAction {
+    #[command(about = "Display comprehensive GPU telemetry, clocks, TGP, and thermals")]
+    Status,
+
+    #[command(about = "Tune GPU power limit and firmware parameters")]
+    Set {
+        #[arg(long, help = "GPU Power Limit / TGP in Watts (5.0 - 115.0 W)")]
+        power_limit: Option<f32>,
+
+        #[arg(long, help = "GPU Thermal Throttle Ceiling (°C)")]
+        gpu_temp: Option<i64>,
+
+        #[arg(long, help = "GPU AC processing power baseline offset in Watts (10 - 85 W)")]
+        ac_offset: Option<i64>,
+
+        #[arg(long, help = "Configurable TGP in Watts")]
+        ctgp: Option<i64>,
+
+        #[arg(long, help = "Dynamic Boost limit (PPAB) in Watts")]
+        ppab: Option<i64>,
+
+        #[arg(long, help = "GPU to CPU Dynamic Boost in Watts")]
+        cpu_boost: Option<i64>,
+    },
+
+    #[command(about = "Lock GPU graphics core clocks (min_mhz,max_mhz)")]
+    LockClocks {
+        #[arg(help = "Minimum frequency in MHz")]
+        min: u32,
+        #[arg(help = "Maximum frequency in MHz")]
+        max: u32,
+    },
+
+    #[command(about = "Reset GPU graphics core clocks to automatic driver management")]
+    ResetClocks,
 }
 
 // ----------------------------------------------------------------------------

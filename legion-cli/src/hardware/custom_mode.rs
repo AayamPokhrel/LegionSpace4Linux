@@ -88,7 +88,7 @@ pub fn set_firmware_attribute(attr_name: &str, value: i64) -> Result<()> {
     let max_val = read_i64(attr_dir.join("max_value"));
 
     if let (Some(min), Some(max)) = (min_val, max_val) {
-        if value < min || value > max {
+        if min < max && (value < min || value > max) {
             return Err(LegionError::InvalidValue(format!(
                 "Value {} for '{}' is out of bounds [{}-{}]",
                 value, attr_name, min, max
@@ -103,6 +103,12 @@ pub fn set_firmware_attribute(attr_name: &str, value: i64) -> Result<()> {
                 path: target_file.display().to_string(),
                 action: "write",
             }
+        } else if e.raw_os_error() == Some(16) {
+            LegionError::UnsupportedFeature(format!(
+                "Firmware attribute '{}' is currently locked by the EC/BIOS (Device busy). \
+                 Ensure laptop is plugged into AC power and Custom Mode is active.",
+                attr_name
+            ))
         } else {
             LegionError::Io(e)
         }

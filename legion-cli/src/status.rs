@@ -1,4 +1,4 @@
-use crate::hardware::{battery, custom_mode, fan, lighting, probe, thermal};
+use crate::hardware::{battery, custom_mode, fan, gpu, lighting, probe, thermal};
 use colored::*;
 use serde::{Deserialize, Serialize};
 
@@ -7,6 +7,7 @@ pub struct LegionFullStatus {
     pub dmi: probe::DmiInfo,
     pub thermal: Option<thermal::ThermalStatus>,
     pub fans: Option<fan::FanSystemStatus>,
+    pub gpu: Option<gpu::GpuTelemetry>,
     pub battery: Option<battery::BatteryDetails>,
     pub lighting: Option<lighting::LightingStatus>,
     pub custom: Option<custom_mode::CustomModeConfig>,
@@ -16,6 +17,7 @@ pub fn get_full_status() -> LegionFullStatus {
     let dmi = probe::probe_dmi();
     let thermal = thermal::get_thermal_status().ok();
     let fans = fan::get_fan_status().ok();
+    let gpu = gpu::get_gpu_telemetry().ok();
     let battery = battery::get_battery_details().ok();
     let lighting = lighting::get_lighting_status().ok();
     let custom = custom_mode::get_custom_mode_config().ok();
@@ -24,6 +26,7 @@ pub fn get_full_status() -> LegionFullStatus {
         dmi,
         thermal,
         fans,
+        gpu,
         battery,
         lighting,
         custom,
@@ -79,6 +82,49 @@ pub fn print_full_status(status: &LegionFullStatus) {
         }
     } else {
         println!("  Status:            {}", "Fan telemetry unavailable".red());
+    }
+    println!();
+
+    // Discrete GPU
+    println!("{}", "[NVIDIA Discrete GPU]".yellow().bold());
+    if let Some(g) = &status.gpu {
+        if g.available {
+            println!("  Model:             {}", g.name.green().bold());
+            println!("  VBIOS / Driver:    {} / {}", g.vbios_version, g.driver_version);
+            println!(
+                "  Temperature:       {} °C (Ceiling: {} °C)",
+                format!("{}", g.current_temp_c).cyan().bold(),
+                g.target_temp_c
+            );
+            println!(
+                "  Power Draw:        {:.2} W (TGP Limit: {:.1} W, Range: {:.1} - {:.1} W)",
+                g.power_draw_w, g.power_limit_w, g.min_power_limit_w, g.max_power_limit_w
+            );
+            println!(
+                "  Graphics Clock:    {} MHz (Max: {} MHz)",
+                g.graphics_clock_mhz, g.max_graphics_clock_mhz
+            );
+            println!("  Memory Clock:      {} MHz", g.memory_clock_mhz);
+            println!(
+                "  VRAM Memory:       {} MiB / {} MiB ({:.1}% used)",
+                g.vram_used_mib,
+                g.vram_total_mib,
+                (g.vram_used_mib as f64 / g.vram_total_mib.max(1) as f64) * 100.0
+            );
+            if let Some(c) = g.nv_ctgp_w {
+                println!("  Configurable TGP:  {} W", c);
+            }
+            if let Some(p) = g.nv_ppab_w {
+                println!("  Dynamic Boost:     {} W", p);
+            }
+            if let Some(o) = g.nv_ac_offset_w {
+                println!("  AC Baseline Offset:{} W", o);
+            }
+        } else {
+            println!("  Status:            {}", "Discrete GPU inactive or sleeping".white());
+        }
+    } else {
+        println!("  Status:            {}", "GPU telemetry unavailable".red());
     }
     println!();
 
