@@ -1,16 +1,10 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Legion Space Linux GUI Launcher (v1.0.0)
-# Launches background server daemon & native desktop standalone app window
+# Legion Space Linux GUI Launcher (v1.4.0)
+# Native Rust Material You desktop application
 # ==============================================================================
 set -euo pipefail
 
-PORT=9090
-URL="http://127.0.0.1:${PORT}"
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/legionspace"
-mkdir -p "$CONFIG_DIR"
-
-# Resolve script directory to locate server.py
 SCRIPT_SOURCE="${BASH_SOURCE[0]}"
 while [ -h "$SCRIPT_SOURCE" ]; do
   DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")" >/dev/null 2>&1 && pwd)"
@@ -18,54 +12,32 @@ while [ -h "$SCRIPT_SOURCE" ]; do
   [[ $SCRIPT_SOURCE != /* ]] && SCRIPT_SOURCE="$DIR/$SCRIPT_SOURCE"
 done
 ROOT_DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")/.." >/dev/null 2>&1 && pwd)"
-SERVER_SCRIPT="${ROOT_DIR}/legion-gui/server.py"
 
-# If not found relative to script, check fallback locations
-if [ ! -f "$SERVER_SCRIPT" ]; then
-  if [ -f "$HOME/Legion_Space/legion-gui/server.py" ]; then
-    SERVER_SCRIPT="$HOME/Legion_Space/legion-gui/server.py"
-  elif [ -f "/usr/local/share/legionspace/server.py" ]; then
-    SERVER_SCRIPT="/usr/local/share/legionspace/server.py"
+CANDIDATES=(
+  "${ROOT_DIR}/legion-gui/target/release/legionspace"
+  "${HOME}/.local/bin/legionspace"
+  "/usr/local/bin/legionspace"
+  "/usr/bin/legionspace"
+)
+
+BIN=""
+for c in "${CANDIDATES[@]}"; do
+  if [ -x "$c" ]; then
+    BIN="$c"
+    break
+  fi
+done
+
+if [ -z "$BIN" ]; then
+  if command -v legionspace >/dev/null 2>&1; then
+    BIN="$(command -v legionspace)"
   fi
 fi
 
-# Check if backend server is already active
-is_server_running() {
-  curl -s --connect-timeout 0.4 "${URL}/api/ping" >/dev/null 2>&1
-}
-
-if ! is_server_running; then
-  echo "Starting Legion Space backend daemon..."
-  python3 "$SERVER_SCRIPT" --daemon
-
-  # Wait for server to become ready
-  for i in {1..20}; do
-    if is_server_running; then
-      break
-    fi
-    sleep 0.1
-  done
+if [ -z "$BIN" ]; then
+  echo "Error: Native Legion Space GUI binary not found." >&2
+  echo "Please build or install first: make build && make install-user" >&2
+  exit 1
 fi
 
-# Launch standalone borderless window
-if command -v google-chrome >/dev/null 2>&1; then
-  exec google-chrome \
-    --app="${URL}" \
-    --class="legionspace" \
-    --name="legionspace" \
-    --user-data-dir="${CONFIG_DIR}/chrome-profile" \
-    --no-first-run \
-    --no-default-browser-check \
-    "$@"
-elif command -v chromium >/dev/null 2>&1; then
-  exec chromium \
-    --app="${URL}" \
-    --class="legionspace" \
-    --user-data-dir="${CONFIG_DIR}/chrome-profile" \
-    "$@"
-elif command -v epiphany >/dev/null 2>&1; then
-  exec epiphany --application-mode="${URL}" "$@"
-else
-  echo "No dedicated web app runtime found, opening in default browser..."
-  exec xdg-open "${URL}"
-fi
+exec "$BIN" "$@"

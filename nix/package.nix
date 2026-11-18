@@ -2,7 +2,7 @@
 
 rustPlatform.buildRustPackage {
   pname = "legion-cli";
-  version = "1.0.0";
+  version = "1.4.0";
 
   src = ../legion-cli;
 

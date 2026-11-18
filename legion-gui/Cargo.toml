@@ -1,0 +1,17 @@
+[package]
+name = "legionspace-gui"
+version = "1.4.0"
+edition = "2021"
+authors = ["AayamPokhrel <pokhrelaayam1010@gmail.com>"]
+description = "Native Rust Material You desktop application for Lenovo Legion laptops"
+
+[[bin]]
+name = "legionspace"
+path = "src/main.rs"
+
+[dependencies]
+legion-cli = { path = "../legion-cli" }
+eframe = { version = "0.29", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+egui = "0.29"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

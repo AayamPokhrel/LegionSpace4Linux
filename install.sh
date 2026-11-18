@@ -37,17 +37,28 @@ echo ""
 # ------------------------------------------------------------------------------
 # 1. Build Binaries
 # ------------------------------------------------------------------------------
-echo -e "${CYAN}${BOLD}[1/5] Building release binaries (legion-cli, legionctl)...${NC}"
+echo -e "${CYAN}${BOLD}[1/5] Building release binaries (legion-cli, legionctl, legionspace)...${NC}"
 cd "${REPO_DIR}"
 if [ ! -f "legion-cli/target/release/legion-cli" ] || [ ! -f "legion-cli/target/release/legionctl" ]; then
-    echo -e "      Compiling via Cargo..."
+    echo -e "      Compiling CLI via Cargo..."
     if command -v cargo &>/dev/null; then
         (cd legion-cli && cargo build --release)
     else
         nix-shell -p cargo rustc --run "cd legion-cli && cargo build --release"
     fi
 else
-    echo -e "      ${GREEN}Pre-compiled release binaries found and ready.${NC}"
+    echo -e "      ${GREEN}Pre-compiled CLI binaries found and ready.${NC}"
+fi
+
+if [ ! -f "legion-gui/target/release/legionspace" ]; then
+    echo -e "      Compiling Material You GUI via Cargo..."
+    if command -v cargo &>/dev/null; then
+        (cd legion-gui && cargo build --release)
+    else
+        nix-shell -p cargo rustc pkg-config wayland libxkbcommon libGL --run "cd legion-gui && cargo build --release"
+    fi
+else
+    echo -e "      ${GREEN}Pre-compiled native Rust GUI binary found and ready.${NC}"
 fi
 
 # ------------------------------------------------------------------------------
@@ -57,7 +68,11 @@ echo -e "${CYAN}${BOLD}[2/5] Installing CLI binaries and Material You GUI...${NC
 mkdir -p /usr/local/bin /usr/local/share/applications /usr/local/share/icons/hicolor/scalable/apps /usr/local/share/legionspace
 cp "${REPO_DIR}/legion-cli/target/release/legion-cli" /usr/local/bin/legion-cli
 cp "${REPO_DIR}/legion-cli/target/release/legionctl" /usr/local/bin/legionctl
-if [ -f "${REPO_DIR}/bin/legionspace" ]; then
+if [ -f "${REPO_DIR}/legion-gui/target/release/legionspace" ]; then
+    cp "${REPO_DIR}/legion-gui/target/release/legionspace" /usr/local/bin/legionspace
+    cp "${REPO_DIR}/legion-gui/target/release/legionspace" /usr/local/bin/legion-gui
+    chmod 755 /usr/local/bin/legionspace /usr/local/bin/legion-gui
+elif [ -f "${REPO_DIR}/bin/legionspace" ]; then
     cp "${REPO_DIR}/bin/legionspace" /usr/local/bin/legionspace
     cp "${REPO_DIR}/bin/legionspace" /usr/local/bin/legion-gui
     chmod 755 /usr/local/bin/legionspace /usr/local/bin/legion-gui
@@ -74,7 +89,11 @@ if [ -d "${REAL_HOME}" ]; then
     mkdir -p "${REAL_HOME}/.local/bin" "${REAL_HOME}/.local/share/applications" "${REAL_HOME}/.local/share/icons/hicolor/scalable/apps"
     cp "${REPO_DIR}/legion-cli/target/release/legion-cli" "${REAL_HOME}/.local/bin/legion-cli"
     cp "${REPO_DIR}/legion-cli/target/release/legionctl" "${REAL_HOME}/.local/bin/legionctl"
-    if [ -f "${REPO_DIR}/bin/legionspace" ]; then
+    if [ -f "${REPO_DIR}/legion-gui/target/release/legionspace" ]; then
+        cp "${REPO_DIR}/legion-gui/target/release/legionspace" "${REAL_HOME}/.local/bin/legionspace"
+        cp "${REPO_DIR}/legion-gui/target/release/legionspace" "${REAL_HOME}/.local/bin/legion-gui"
+        chmod 755 "${REAL_HOME}/.local/bin/legionspace" "${REAL_HOME}/.local/bin/legion-gui"
+    elif [ -f "${REPO_DIR}/bin/legionspace" ]; then
         cp "${REPO_DIR}/bin/legionspace" "${REAL_HOME}/.local/bin/legionspace"
         cp "${REPO_DIR}/bin/legionspace" "${REAL_HOME}/.local/bin/legion-gui"
         chmod 755 "${REAL_HOME}/.local/bin/legionspace" "${REAL_HOME}/.local/bin/legion-gui"
