@@ -1,0 +1,27 @@
+# ==============================================================================
+# Lenovo Legion Linux Userspace Driver - udev rules
+# Hardware: Lenovo Legion Pro 5 16ADR10 (and compatible Legion 2023-2025 laptops)
+#
+# Grants non-root users direct control over:
+#  - ITE 8258 USB HID 4-Zone RGB Lighting Controller
+#  - ACPI / WMI Thermal Platform Profile (Quiet, Balanced, Performance, Custom)
+#  - Cooling Fan Targets (Fan 1 CPU, Fan 2 GPU)
+#  - Battery Conservation Mode (80% charge threshold) & Always-On USB
+#  - Custom Mode Firmware Attributes (PL1, PL2, PL3, CPU/GPU thermal limits)
+# ==============================================================================
+
+# 1. ITE 8258 RGB USB HID Device (048d:c195)
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="c195", MODE="0666", TAG+="uaccess"
+
+# 2. ACPI Platform Profile (/sys/firmware/acpi/platform_profile)
+SUBSYSTEM=="platform-profile", KERNEL=="platform-profile*", MODE="0666", TAG+="uaccess", RUN+="/bin/sh -c 'chmod 0666 /sys/firmware/acpi/platform_profile /sys/firmware/acpi/platform_profile_choices /sys%p/profile 2>/dev/null || true'"
+
+# 3. Cooling Fan Speed Targets via lenovo_wmi_other HWMON
+SUBSYSTEM=="hwmon", ATTR{name}=="lenovo_wmi_other", MODE="0666", TAG+="uaccess", RUN+="/bin/sh -c 'chmod 0666 /sys%p/fan1_target /sys%p/fan2_target 2>/dev/null || true'"
+
+# 4. Lenovo Ideapad / VPC2004 ACPI Platform Device (Battery Conservation, Fn-Lock, Fan Mode, USB Charging)
+SUBSYSTEM=="platform", DRIVER=="ideapad_acpi", MODE="0666", TAG+="uaccess", RUN+="/bin/sh -c 'chmod 0666 /sys%p/conservation_mode /sys%p/usb_charging /sys%p/fn_lock /sys%p/fan_mode /sys%p/leds/platform::kbd_backlight/brightness 2>/dev/null || true'"
+
+# 5. Lenovo WMI Custom Mode Firmware Attributes
+SUBSYSTEM=="firmware-attributes", KERNEL=="lenovo-wmi-other*", MODE="0666", TAG+="uaccess", RUN+="/bin/sh -c 'chmod 0666 /sys%p/attributes/*/current_value 2>/dev/null || true'"
+
