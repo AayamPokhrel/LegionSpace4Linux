@@ -2,6 +2,7 @@
 # ==============================================================================
 # Legion Space Linux GUI Launcher (v1.4.0)
 # Native Rust Material You desktop application
+# Automatically configures runtime Wayland & OpenGL libraries on NixOS
 # ==============================================================================
 set -euo pipefail
 
@@ -13,31 +14,33 @@ while [ -h "$SCRIPT_SOURCE" ]; do
 done
 ROOT_DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")/.." >/dev/null 2>&1 && pwd)"
 
-CANDIDATES=(
-  "${ROOT_DIR}/legion-gui/target/release/legionspace"
-  "${HOME}/.local/bin/legionspace"
-  "/usr/local/bin/legionspace"
-  "/usr/bin/legionspace"
+# 1. Prefer nix-wrapped binary if built
+NIX_WRAPPED_CANDIDATES=(
+  "${ROOT_DIR}/.nix-result/bin/legionspace"
+  "${ROOT_DIR}/result/bin/legionspace"
+  "/run/current-system/sw/bin/legionspace"
 )
 
-BIN=""
-for c in "${CANDIDATES[@]}"; do
-  if [ -x "$c" ]; then
-    BIN="$c"
-    break
+for w in "${NIX_WRAPPED_CANDIDATES[@]}"; do
+  if [ -x "$w" ]; then
+    exec "$w" "$@"
   fi
 done
 
-if [ -z "$BIN" ]; then
-  if command -v legionspace >/dev/null 2>&1; then
-    BIN="$(command -v legionspace)"
+# 2. Inject required runtime graphics libraries for dlopen() in winit on NixOS
+export LD_LIBRARY_PATH="/run/opengl-driver/lib:/run/opengl-driver-32/lib:/nix/store/md555jfqdvwxhzm93mv3yl1ki6a2yd3g-wayland-1.26.0/lib:/nix/store/4irfnnwv8iq34pf2irccxz1ypxy3plg9-libxkbcommon-1.13.2/lib:/nix/store/j6crvk2m147s1wp0gs26iyqm26srchxz-libglvnd-1.7.0/lib:/nix/store/1l0a4cq8ahhpgwx0byq2zcsi316mlzm1-vulkan-loader-1.4.363.0/lib:/nix/store/nz6yl26svfj0qap9qnpvd26yp2gxn3xl-libx11-1.8.14/lib:/nix/store/r3j78xcnqf1jl46gj7jj3bdvijyk0nvv-libxcursor-1.2.3/lib:/nix/store/s50a95k9yig5a9y1v014yg47kj0cy638-libxrandr-1.5.5/lib:/nix/store/cyhr3klhvaggc0bcqqb67b25ly33bgfg-libxi-1.8.4/lib:${LD_LIBRARY_PATH:-}"
+
+UNWRAPPED_CANDIDATES=(
+  "${ROOT_DIR}/legion-gui/target/release/legionspace"
+  "${HOME}/.local/bin/.legionspace-unwrapped"
+)
+
+for u in "${UNWRAPPED_CANDIDATES[@]}"; do
+  if [ -x "$u" ]; then
+    exec "$u" "$@"
   fi
-fi
+done
 
-if [ -z "$BIN" ]; then
-  echo "Error: Native Legion Space GUI binary not found." >&2
-  echo "Please build or install first: make build && make install-user" >&2
-  exit 1
-fi
-
-exec "$BIN" "$@"
+echo "Error: Native Legion Space GUI binary not found." >&2
+echo "Please build or install first: make build && make install-user" >&2
+exit 1

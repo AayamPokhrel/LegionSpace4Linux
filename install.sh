@@ -78,9 +78,10 @@ if [ -d "${REAL_HOME}" ]; then
     mkdir -p "${REAL_HOME}/.local/bin" "${REAL_HOME}/.local/share/applications" "${REAL_HOME}/.local/share/icons/hicolor/scalable/apps"
     cp "$CLI_BIN" "${REAL_HOME}/.local/bin/legion-cli"
     cp "$CTL_BIN" "${REAL_HOME}/.local/bin/legionctl"
-    cp "$GUI_BIN" "${REAL_HOME}/.local/bin/legionspace"
-    cp "$GUI_BIN" "${REAL_HOME}/.local/bin/legion-gui"
-    chmod 755 "${REAL_HOME}/.local/bin/legion-cli" "${REAL_HOME}/.local/bin/legionctl" "${REAL_HOME}/.local/bin/legionspace" "${REAL_HOME}/.local/bin/legion-gui"
+    cp "$GUI_BIN" "${REAL_HOME}/.local/bin/.legionspace-unwrapped"
+    cp "${REPO_DIR}/bin/legionspace" "${REAL_HOME}/.local/bin/legionspace"
+    cp "${REPO_DIR}/bin/legionspace" "${REAL_HOME}/.local/bin/legion-gui"
+    chmod 755 "${REAL_HOME}/.local/bin/legion-cli" "${REAL_HOME}/.local/bin/legionctl" "${REAL_HOME}/.local/bin/legionspace" "${REAL_HOME}/.local/bin/legion-gui" "${REAL_HOME}/.local/bin/.legionspace-unwrapped"
 
     if [ -f "${REPO_DIR}/desktop/legion-space.desktop" ]; then
         cp "${REPO_DIR}/desktop/legion-space.desktop" "${REAL_HOME}/.local/share/applications/"
@@ -101,9 +102,10 @@ if [ "$IS_ROOT" = true ]; then
     if [ -w /usr/local/bin ]; then
         cp "$CLI_BIN" /usr/local/bin/legion-cli
         cp "$CTL_BIN" /usr/local/bin/legionctl
-        cp "$GUI_BIN" /usr/local/bin/legionspace
-        cp "$GUI_BIN" /usr/local/bin/legion-gui
-        chmod 755 /usr/local/bin/legion-cli /usr/local/bin/legionctl /usr/local/bin/legionspace /usr/local/bin/legion-gui
+        cp "$GUI_BIN" /usr/local/bin/.legionspace-unwrapped
+        cp "${REPO_DIR}/bin/legionspace" /usr/local/bin/legionspace
+        cp "${REPO_DIR}/bin/legionspace" /usr/local/bin/legion-gui
+        chmod 755 /usr/local/bin/legion-cli /usr/local/bin/legionctl /usr/local/bin/legionspace /usr/local/bin/legion-gui /usr/local/bin/.legionspace-unwrapped
         echo -e "      ${GREEN}[OK] Installed system-wide to /usr/local/bin${NC}"
     fi
     if [ -w /usr/local/share/applications ] && [ -f "${REPO_DIR}/desktop/legion-space.desktop" ]; then

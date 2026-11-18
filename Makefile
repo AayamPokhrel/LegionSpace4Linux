@@ -54,8 +54,9 @@ install-user: build
 	install -d $(HOME)/.local/bin $(HOME)/.local/share/applications $(HOME)/.local/share/icons/hicolor/scalable/apps
 	install -m 755 $(CLI_TARGET_DIR)/legion-cli $(HOME)/.local/bin/legion-cli
 	install -m 755 $(CLI_TARGET_DIR)/legionctl $(HOME)/.local/bin/legionctl
-	install -m 755 $(GUI_TARGET_DIR)/legionspace $(HOME)/.local/bin/legionspace
-	install -m 755 $(GUI_TARGET_DIR)/legionspace $(HOME)/.local/bin/legion-gui
+	install -m 755 $(GUI_TARGET_DIR)/legionspace $(HOME)/.local/bin/.legionspace-unwrapped
+	install -m 755 bin/legionspace $(HOME)/.local/bin/legionspace
+	install -m 755 bin/legionspace $(HOME)/.local/bin/legion-gui
 	install -m 644 desktop/legion-space.desktop $(HOME)/.local/share/applications/legion-space.desktop
 	install -m 644 desktop/legion-space.svg $(HOME)/.local/share/icons/hicolor/scalable/apps/legion-space.svg
 	@echo "==> Binaries & Legion Space GUI installed to $(HOME)/.local/bin"
