@@ -1,0 +1,642 @@
+use crate::cli::*;
+use crate::error::{LegionError, Result};
+use crate::hardware::{battery, custom_mode, fan, lighting, probe, thermal};
+use crate::status;
+use colored::*;
+use serde::Serialize;
+use std::process;
+
+#[derive(Serialize)]
+struct ActionResponse<T: Serialize> {
+    success: bool,
+    action: &'static str,
+    data: T,
+}
+
+#[derive(Serialize)]
+struct ErrorResponse {
+    success: bool,
+    error: String,
+}
+
+pub fn run(cli: Cli) {
+    if let Err(err) = dispatch(&cli) {
+        if cli.json {
+            let resp = ErrorResponse {
+                success: false,
+                error: err.to_string(),
+            };
+            if let Ok(s) = serde_json::to_string_pretty(&resp) {
+                eprintln!("{}", s);
+            } else {
+                eprintln!("{{\"success\":false,\"error\":\"{}\"}}", err);
+            }
+        } else {
+            eprintln!();
+            eprintln!("{} {}", "Error:".red().bold(), err);
+            if let LegionError::PermissionDenied { path, action: _ } = &err {
+                eprintln!();
+                eprintln!("{}", "--- Permission Denied Guidance ---".yellow().bold());
+                eprintln!(
+                    "Writing to '{}' requires elevated privileges or proper udev rules.",
+                    path
+                );
+                eprintln!("To grant standard user access without sudo, install the Legion udev rules:");
+                eprintln!("  sudo cp udev/99-lenovo-legion.rules /etc/udev/rules.d/");
+                eprintln!("  sudo udevadm control --reload && sudo udevadm trigger");
+                eprintln!();
+                eprintln!("On NixOS, enable the native Legion module in configuration.nix:");
+                eprintln!("  hardware.lenovo-legion.enable = true;");
+                eprintln!("----------------------------------");
+            }
+        }
+        process::exit(1);
+    }
+}
+
+fn dispatch(cli: &Cli) -> Result<()> {
+    match &cli.command {
+        None | Some(Commands::Status) => handle_status(cli.json),
+        Some(Commands::Probe) => handle_probe(cli.json),
+        Some(Commands::Profile(cmd)) => handle_profile(cmd, cli.json),
+        Some(Commands::Fan(cmd)) => handle_fan(cmd, cli.json),
+        Some(Commands::Battery(cmd)) => handle_battery(cmd, cli.json),
+        Some(Commands::Custom(cmd)) => handle_custom(cmd, cli.json),
+        Some(Commands::Lighting(cmd)) => handle_lighting(cmd, cli.json),
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Status & Probe Handlers
+// ----------------------------------------------------------------------------
+fn handle_status(json: bool) -> Result<()> {
+    let s = status::get_full_status();
+    if json {
+        println!("{}", serde_json::to_string_pretty(&s).unwrap());
+    } else {
+        status::print_full_status(&s);
+    }
+    Ok(())
+}
+
+fn handle_probe(json: bool) -> Result<()> {
+    let report = probe::run_full_probe();
+    if json {
+        println!("{}", serde_json::to_string_pretty(&report).unwrap());
+    } else {
+        probe::print_probe_report(&report);
+    }
+    Ok(())
+}
+
+// ----------------------------------------------------------------------------
+// Thermal Profile Handlers
+// ----------------------------------------------------------------------------
+fn handle_profile(cmd: &ProfileCmd, json: bool) -> Result<()> {
+    match &cmd.action {
+        None | Some(ProfileAction::Get) => {
+            let status = thermal::get_thermal_status()?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&status).unwrap());
+            } else {
+                println!(
+                    "Active Profile: {} (Power LED: {})",
+                    status.current_profile.cyan().bold(),
+                    status.power_led_color.white().bold()
+                );
+            }
+        }
+        Some(ProfileAction::Set { name }) => {
+            let updated = thermal::set_thermal_profile(name)?;
+            if json {
+                let resp = ActionResponse {
+                    success: true,
+                    action: "profile_set",
+                    data: &updated,
+                };
+                println!("{}", serde_json::to_string_pretty(&resp).unwrap());
+            } else {
+                println!(
+                    "{} Switched thermal profile to '{}' (Power LED: {})",
+                    "[OK]".green().bold(),
+                    updated.current_profile.cyan().bold(),
+                    updated.power_led_color.white().bold()
+                );
+            }
+        }
+        Some(ProfileAction::List) => {
+            let status = thermal::get_thermal_status()?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&status.available_choices).unwrap());
+            } else {
+                println!("{}", "Available Thermal Profiles:".cyan().bold());
+                for choice in &status.available_choices {
+                    let led = thermal::map_led_color(choice);
+                    if choice == &status.current_profile {
+                        println!(
+                            "  * {:<14} (Power LED: {:<11}) {}",
+                            choice.green().bold(),
+                            led,
+                            "[ACTIVE]".cyan().bold()
+                        );
+                    } else {
+                        println!("  - {:<14} (Power LED: {})", choice, led);
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+// ----------------------------------------------------------------------------
+// Fan Handlers
+// ----------------------------------------------------------------------------
+fn handle_fan(cmd: &FanCmd, json: bool) -> Result<()> {
+    match &cmd.action {
+        None | Some(FanAction::Status) => {
+            let status = fan::get_fan_status()?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&status).unwrap());
+            } else {
+                println!("{}", "Cooling Fan Telemetry:".cyan().bold());
+                for f in &status.fans {
+                    let mode_str = if f.is_manual {
+                        format!("Manual Target: {} RPM", f.target_rpm).yellow()
+                    } else {
+                        "Automatic Curve".green()
+                    };
+                    println!(
+                        "  {:<16} Current: {:>4} RPM  [Limits: {}-{} RPM]  Mode: {}",
+                        f.label,
+                        format!("{}", f.current_rpm).cyan().bold(),
+                        f.min_rpm,
+                        f.max_rpm,
+                        mode_str
+                    );
+                }
+            }
+        }
+        Some(FanAction::Set { fan1, fan2, both }) => {
+            if let Some(target) = both {
+                fan::set_both_fans(*target, *target)?;
+            } else {
+                if let Some(target1) = fan1 {
+                    fan::set_fan_target(1, *target1)?;
+                }
+                if let Some(target2) = fan2 {
+                    fan::set_fan_target(2, *target2)?;
+                }
+            }
+            let status = fan::get_fan_status()?;
+            if json {
+                let resp = ActionResponse {
+                    success: true,
+                    action: "fan_set",
+                    data: &status,
+                };
+                println!("{}", serde_json::to_string_pretty(&resp).unwrap());
+            } else {
+                println!("{} Fan speed targets updated successfully.", "[OK]".green().bold());
+                for f in &status.fans {
+                    println!("  {}: target set to {} RPM", f.label, f.target_rpm);
+                }
+            }
+        }
+        Some(FanAction::Auto) => {
+            let status = fan::set_auto()?;
+            if json {
+                let resp = ActionResponse {
+                    success: true,
+                    action: "fan_auto",
+                    data: &status,
+                };
+                println!("{}", serde_json::to_string_pretty(&resp).unwrap());
+            } else {
+                println!(
+                    "{} Restored automatic firmware fan control curves.",
+                    "[OK]".green().bold()
+                );
+            }
+        }
+        Some(FanAction::Full) => {
+            let status = fan::set_full_speed()?;
+            if json {
+                let resp = ActionResponse {
+                    success: true,
+                    action: "fan_full_speed",
+                    data: &status,
+                };
+                println!("{}", serde_json::to_string_pretty(&resp).unwrap());
+            } else {
+                println!(
+                    "{} Fans set to maximum rated speed (5100 RPM).",
+                    "[OK]".green().bold()
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+// ----------------------------------------------------------------------------
+// Battery Handlers
+// ----------------------------------------------------------------------------
+fn handle_battery(cmd: &BatteryCmd, json: bool) -> Result<()> {
+    match &cmd.action {
+        None | Some(BatteryAction::Status) => {
+            let details = battery::get_battery_details()?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&details).unwrap());
+            } else {
+                println!("{}", "Battery & Power Subsystem:".cyan().bold());
+                println!("  Capacity:          {}% ({})", details.capacity_percent, details.status);
+                let cm_str = if details.conservation_mode {
+                    "ENABLED (Capped at 80% to protect battery lifespan)".green().bold()
+                } else {
+                    "DISABLED (Normal charging to 100%)".white()
+                };
+                println!("  Conservation Mode: {}", cm_str);
+                if let Some(h) = details.health_percent {
+                    println!(
+                        "  Battery Health:    {:.1}% ({:.1} Wh / {:.1} Wh)",
+                        h, details.energy_full_wh, details.energy_design_wh
+                    );
+                }
+                println!("  Power Rate:        {:.2} W", details.power_now_w);
+                println!("  Voltage:           {:.2} V", details.voltage_now_v);
+                if let Some(c) = details.cycle_count {
+                    println!("  Cycle Count:       {}", c);
+                }
+                if let Some(usb) = details.usb_charging {
+                    println!("  Always-On USB:     {}", if usb { "Enabled" } else { "Disabled" });
+                }
+            }
+        }
+        Some(BatteryAction::Conservation { state }) => {
+            match state {
+                Some(st) => {
+                    let enable = st.is_enabled();
+                    let updated = battery::set_conservation_mode(enable)?;
+                    if json {
+                        let resp = ActionResponse {
+                            success: true,
+                            action: "battery_conservation_set",
+                            data: &updated,
+                        };
+                        println!("{}", serde_json::to_string_pretty(&resp).unwrap());
+                    } else {
+                        let msg = if enable {
+                            "Enabled (Charging capped at ~80% for battery preservation)"
+                        } else {
+                            "Disabled (Full 100% charging enabled)"
+                        };
+                        println!("{} Battery Conservation Mode: {}", "[OK]".green().bold(), msg.cyan().bold());
+                    }
+                }
+                None => {
+                    let details = battery::get_battery_details()?;
+                    if json {
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&serde_json::json!({
+                                "conservation_mode": details.conservation_mode
+                            }))
+                            .unwrap()
+                        );
+                    } else {
+                        println!(
+                            "Conservation Mode is currently: {}",
+                            if details.conservation_mode {
+                                "ENABLED".green().bold()
+                            } else {
+                                "DISABLED".white()
+                            }
+                        );
+                    }
+                }
+            }
+        }
+        Some(BatteryAction::UsbCharge { state }) => {
+            match state {
+                Some(st) => {
+                    let enable = st.is_enabled();
+                    let updated = battery::set_usb_charging(enable)?;
+                    if json {
+                        let resp = ActionResponse {
+                            success: true,
+                            action: "battery_usb_charging_set",
+                            data: &updated,
+                        };
+                        println!("{}", serde_json::to_string_pretty(&resp).unwrap());
+                    } else {
+                        println!(
+                            "{} Always-on USB charging set to: {}",
+                            "[OK]".green().bold(),
+                            if enable { "Enabled".green() } else { "Disabled".white() }
+                        );
+                    }
+                }
+                None => {
+                    let details = battery::get_battery_details()?;
+                    if json {
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&serde_json::json!({
+                                "usb_charging": details.usb_charging
+                            }))
+                            .unwrap()
+                        );
+                    } else {
+                        println!(
+                            "Always-on USB charging is currently: {:?}",
+                            details.usb_charging
+                        );
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+// ----------------------------------------------------------------------------
+// Custom Mode Handlers
+// ----------------------------------------------------------------------------
+fn handle_custom(cmd: &CustomCmd, json: bool) -> Result<()> {
+    match &cmd.action {
+        None | Some(CustomAction::Status) => {
+            let conf = custom_mode::get_custom_mode_config()?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&conf).unwrap());
+            } else {
+                println!("{}", "Custom Mode Firmware Attributes:".cyan().bold());
+                for attr in &conf.attributes {
+                    let range = match (attr.min_value, attr.max_value) {
+                        (Some(min), Some(max)) => format!(" [Range: {}..{}]", min, max),
+                        _ => String::new(),
+                    };
+                    let def = attr
+                        .default_value
+                        .map(|d| format!(" (Default: {})", d))
+                        .unwrap_or_default();
+                    println!(
+                        "  {:<24} = {:>4}{}{}",
+                        attr.name,
+                        format!("{}", attr.current_value).cyan().bold(),
+                        range,
+                        def.white()
+                    );
+                }
+            }
+        }
+        Some(CustomAction::Set {
+            name,
+            value,
+            pl1,
+            pl2,
+            pl3,
+            cpu_temp,
+            gpu_temp,
+            tgp_offset,
+        }) => {
+            let mut changes = Vec::new();
+
+            if let (Some(n), Some(v)) = (name, value) {
+                custom_mode::set_firmware_attribute(n, *v)?;
+                changes.push(format!("{} = {}", n, v));
+            }
+            if let Some(v) = pl1 {
+                custom_mode::set_firmware_attribute("ppt_pl1_spl", *v)?;
+                changes.push(format!("ppt_pl1_spl = {} W", v));
+            }
+            if let Some(v) = pl2 {
+                custom_mode::set_firmware_attribute("ppt_pl2_sppt", *v)?;
+                changes.push(format!("ppt_pl2_sppt = {} W", v));
+            }
+            if let Some(v) = pl3 {
+                custom_mode::set_firmware_attribute("ppt_pl3_fppt", *v)?;
+                changes.push(format!("ppt_pl3_fppt = {} W", v));
+            }
+            if let Some(v) = cpu_temp {
+                custom_mode::set_firmware_attribute("cpu_temp", *v)?;
+                changes.push(format!("cpu_temp = {} °C", v));
+            }
+            if let Some(v) = gpu_temp {
+                custom_mode::set_firmware_attribute("gpu_temp", *v)?;
+                changes.push(format!("gpu_temp = {} °C", v));
+            }
+            if let Some(v) = tgp_offset {
+                custom_mode::set_firmware_attribute("gpu_nv_ac_offset", *v)?;
+                changes.push(format!("gpu_nv_ac_offset = {} W", v));
+            }
+
+            if changes.is_empty() {
+                return Err(LegionError::InvalidValue(
+                    "No attribute options provided. Use --name and --value, or --pl1, --pl2, --cpu-temp, etc."
+                        .into(),
+                ));
+            }
+
+            let conf = custom_mode::get_custom_mode_config()?;
+            if json {
+                let resp = ActionResponse {
+                    success: true,
+                    action: "custom_attributes_set",
+                    data: &conf,
+                };
+                println!("{}", serde_json::to_string_pretty(&resp).unwrap());
+            } else {
+                println!("{} Firmware attributes updated:", "[OK]".green().bold());
+                for change in changes {
+                    println!("  {}", change.cyan());
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+// ----------------------------------------------------------------------------
+// Lighting Handlers
+// ----------------------------------------------------------------------------
+fn handle_lighting(cmd: &LightingCmd, json: bool) -> Result<()> {
+    match &cmd.action {
+        None | Some(LightingAction::Status) => {
+            let status = lighting::get_lighting_status()?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&status).unwrap());
+            } else {
+                println!("{}", "Lighting & Input Subsystem:".cyan().bold());
+                if let Some(lvl) = status.acpi_backlight_level {
+                    println!("  ACPI Backlight:    Level {} (0=Off, 1=Low, 2=High)", lvl);
+                }
+                if let Some(fn_l) = status.fn_lock {
+                    println!("  Fn-Lock:           {}", if fn_l { "Enabled" } else { "Disabled" });
+                }
+                println!(
+                    "  RGB Controller:    {}",
+                    if status.rgb_controller_detected {
+                        "Detected (ITE 8258 USB HID)".green()
+                    } else {
+                        "Not detected".yellow()
+                    }
+                );
+                if let Some(ref node) = status.hidraw_node {
+                    println!("  HID Node:          {}", node);
+                }
+                println!(
+                    "  Write Permissions: {}",
+                    if status.can_write_hid {
+                        "Granted (Ready for RGB control)".green().bold()
+                    } else {
+                        "Restricted (Install udev rules for unprivileged access)".yellow()
+                    }
+                );
+            }
+        }
+        Some(LightingAction::KbdBacklight { level }) => {
+            lighting::set_acpi_backlight(*level)?;
+            let status = lighting::get_lighting_status()?;
+            if json {
+                let resp = ActionResponse {
+                    success: true,
+                    action: "kbd_backlight_set",
+                    data: &status,
+                };
+                println!("{}", serde_json::to_string_pretty(&resp).unwrap());
+            } else {
+                println!("{} Keyboard backlight set to level {}", "[OK]".green().bold(), level);
+            }
+        }
+        Some(LightingAction::FnLock { state }) => {
+            lighting::set_fn_lock(state.is_enabled())?;
+            let status = lighting::get_lighting_status()?;
+            if json {
+                let resp = ActionResponse {
+                    success: true,
+                    action: "fn_lock_set",
+                    data: &status,
+                };
+                println!("{}", serde_json::to_string_pretty(&resp).unwrap());
+            } else {
+                println!(
+                    "{} Fn-Lock set to {}",
+                    "[OK]".green().bold(),
+                    if state.is_enabled() { "Enabled" } else { "Disabled" }
+                );
+            }
+        }
+        Some(LightingAction::Static {
+            zone,
+            color,
+            brightness,
+        }) => {
+            let rgb = lighting::RgbColor::from_hex(color).ok_or_else(|| {
+                LegionError::InvalidValue(format!("Invalid color code or name: '{}'", color))
+            })?;
+
+            if zone.to_lowercase() == "all" {
+                lighting::set_all_zones(lighting::LightingEffect::Static, 2, *brightness, rgb)?;
+            } else {
+                let z: u8 = zone.parse().map_err(|_| {
+                    LegionError::InvalidValue(format!("Invalid zone '{}'. Expected 1-4 or 'all'", zone))
+                })?;
+                lighting::set_zone_color(z, lighting::LightingEffect::Static, 2, *brightness, rgb)?;
+                lighting::commit_rgb_profile(1, *brightness)?;
+            }
+
+            if json {
+                let resp = serde_json::json!({
+                    "success": true,
+                    "action": "lighting_static",
+                    "zone": zone,
+                    "color": color,
+                    "brightness": brightness
+                });
+                println!("{}", serde_json::to_string_pretty(&resp).unwrap());
+            } else {
+                println!(
+                    "{} Set static color {} on zone {} (brightness: {})",
+                    "[OK]".green().bold(),
+                    color.cyan(),
+                    zone,
+                    brightness
+                );
+            }
+        }
+        Some(LightingAction::Effect {
+            mode,
+            zone,
+            color,
+            speed,
+            brightness,
+        }) => {
+            let effect = lighting::LightingEffect::from_str(mode).ok_or_else(|| {
+                LegionError::InvalidValue(format!("Invalid effect mode '{}'. Expected breath, wave, static, off", mode))
+            })?;
+
+            let rgb = lighting::RgbColor::from_hex(color).ok_or_else(|| {
+                LegionError::InvalidValue(format!("Invalid color '{}'", color))
+            })?;
+
+            if zone.to_lowercase() == "all" {
+                lighting::set_all_zones(effect, *speed, *brightness, rgb)?;
+            } else {
+                let z: u8 = zone.parse().map_err(|_| {
+                    LegionError::InvalidValue(format!("Invalid zone '{}'", zone))
+                })?;
+                lighting::set_zone_color(z, effect, *speed, *brightness, rgb)?;
+                lighting::commit_rgb_profile(1, *brightness)?;
+            }
+
+            if json {
+                let resp = serde_json::json!({
+                    "success": true,
+                    "action": "lighting_effect",
+                    "mode": mode,
+                    "zone": zone,
+                    "color": color,
+                    "speed": speed,
+                    "brightness": brightness
+                });
+                println!("{}", serde_json::to_string_pretty(&resp).unwrap());
+            } else {
+                println!(
+                    "{} Set effect '{}' on zone {} (speed: {}, brightness: {})",
+                    "[OK]".green().bold(),
+                    mode.cyan(),
+                    zone,
+                    speed,
+                    brightness
+                );
+            }
+        }
+        Some(LightingAction::Off) => {
+            lighting::apply_preset("off")?;
+            if json {
+                let resp = serde_json::json!({
+                    "success": true,
+                    "action": "lighting_off"
+                });
+                println!("{}", serde_json::to_string_pretty(&resp).unwrap());
+            } else {
+                println!("{} Keyboard RGB lighting turned off.", "[OK]".green().bold());
+            }
+        }
+        Some(LightingAction::Preset { name }) => {
+            lighting::apply_preset(name)?;
+            if json {
+                let resp = serde_json::json!({
+                    "success": true,
+                    "action": "lighting_preset",
+                    "preset": name
+                });
+                println!("{}", serde_json::to_string_pretty(&resp).unwrap());
+            } else {
+                println!("{} Applied RGB lighting preset '{}'", "[OK]".green().bold(), name.cyan());
+            }
+        }
+    }
+    Ok(())
+}
