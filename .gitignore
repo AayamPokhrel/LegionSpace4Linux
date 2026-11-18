@@ -1,0 +1,8 @@
+legionspace-1.9.11.5_x64_rtm.exe
+extracted/
+target/
+legion-cli/target/
+result
+result-*
+*.log
+*.bak
