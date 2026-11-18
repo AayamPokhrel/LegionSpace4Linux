@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1f26"/>
+      <stop offset="100%" stop-color="#121316"/>
+    </linearGradient>
+    <linearGradient id="legionGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d0bcff"/>
+      <stop offset="50%" stop-color="#a8c7fa"/>
+      <stop offset="100%" stop-color="#80cbc4"/>
+    </linearGradient>
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Squircle Base (Material 3 Expressive Container) -->
+  <rect x="12" y="12" width="232" height="232" rx="64" ry="64" fill="url(#bgGrad)" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+  
+  <!-- Outer Ring Accent -->
+  <circle cx="128" cy="128" r="76" fill="none" stroke="rgba(208,188,255,0.12)" stroke-width="4" stroke-dasharray="8 6"/>
+
+  <!-- Official Lenovo Legion Three-Spoke Star Emblem -->
+  <g transform="translate(128, 128) scale(1.05)" filter="url(#softGlow)">
+    <!-- Spoke Top -->
+    <path d="M 0 -72 L 0 -16 L -10 -8 L 0 0 L 10 -8 L 0 -16 Z" fill="url(#legionGrad)"/>
+    <!-- Spoke Bottom-Right -->
+    <path d="M 62 36 L 14 8 L 4 17 L 0 0 L 13 -3 L 14 8 Z" fill="url(#legionGrad)"/>
+    <!-- Spoke Bottom-Left -->
+    <path d="M -62 36 L -14 8 L -13 -3 L 0 0 L -4 17 L -14 8 Z" fill="url(#legionGrad)"/>
+    <!-- Central Hub Cutout -->
+    <circle cx="0" cy="0" r="16" fill="#16171d" stroke="url(#legionGrad)" stroke-width="4"/>
+  </g>
+</svg>

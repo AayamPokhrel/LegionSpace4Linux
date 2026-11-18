@@ -6,3 +6,5 @@ result
 result-*
 *.log
 *.bak
+__pycache__/
+*.pyc

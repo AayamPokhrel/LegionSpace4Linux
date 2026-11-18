@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Legion Space</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto+Flex:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top App Bar -->
+    <header class="app-bar">
+      <div class="brand">
+        <div class="brand-logo">
+          <svg viewBox="0 0 100 100" class="legion-icon">
+            <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-dasharray="190 70"/>
+            <path d="M 50 18 L 50 50 L 76 68" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="brand-info">
+          <div class="model-row">
+            <span class="model-name" id="device-model">Legion Pro 5 16ADR10</span>
+            <span class="version-badge">v1.0.0</span>
+          </div>
+          <span class="bios-info" id="bios-version">BIOS: RLCN33WW · Linux Native</span>
+        </div>
+      </div>
+
+      <div class="header-status">
+        <div class="status-chip" id="chip-battery">
+          <span class="chip-icon">⚡</span>
+          <span class="chip-text" id="header-battery">79%</span>
+        </div>
+        <div class="status-chip" id="chip-profile">
+          <span class="status-dot dot-perf" id="header-profile-dot"></span>
+          <span class="chip-text" id="header-profile">Balanced</span>
+        </div>
+        <div class="telemetry-live-pill">
+          <span class="live-dot"></span>
+          <span>Live Sync</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <main class="main-content">
+      <!-- Welcome Hero Banner -->
+      <section class="hero-card">
+        <div class="hero-text-col">
+          <span class="hero-eyebrow">Lenovo Legion Hardware Control Suite</span>
+          <h1 class="hero-title">Welcome to Legion Space</h1>
+          <p class="hero-subtitle">Material 3 native systems manager for AMD Ryzen & NVIDIA RTX hardware</p>
+        </div>
+        <div class="hero-art-col">
+          <div class="art-ring ring-outer"></div>
+          <div class="art-ring ring-mid"></div>
+          <div class="art-ring ring-inner">
+            <svg viewBox="0 0 100 100" class="hero-legion-icon">
+              <path d="M 50 12 L 50 50 L 80 70" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round"/>
+              <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-dasharray="180 70"/>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <!-- Frequently Used: Thermal Profiles -->
+      <section class="section-card thermal-section">
+        <div class="section-header">
+          <div class="header-text">
+            <h2>Thermal Power Profile</h2>
+            <p>Direct ACPI platform profile switching with hardware power button LED synchronization</p>
+          </div>
+          <div class="led-badge" id="led-badge">
+            <span class="led-light" id="led-light"></span>
+            <span id="led-label">LED: White (Balanced)</span>
+          </div>
+        </div>
+
+        <div class="profile-pill-selector">
+          <button class="profile-btn" data-profile="quiet" id="btn-profile-quiet">
+            <span class="p-dot dot-quiet"></span>
+            <span class="p-title">Quiet</span>
+            <span class="p-desc">Silent Fans · Power Saving</span>
+          </button>
+          <button class="profile-btn active" data-profile="balanced" id="btn-profile-balanced">
+            <span class="p-dot dot-balanced"></span>
+            <span class="p-title">Balanced</span>
+            <span class="p-desc">Adaptive Auto Dynamics</span>
+          </button>
+          <button class="profile-btn" data-profile="performance" id="btn-profile-perf">
+            <span class="p-dot dot-perf"></span>
+            <span class="p-title">Performance</span>
+            <span class="p-desc">High Clocks · Accelerated</span>
+          </button>
+          <button class="profile-btn" data-profile="custom" id="btn-profile-custom">
+            <span class="p-dot dot-custom"></span>
+            <span class="p-title">Custom</span>
+            <span class="p-desc">Manual PL1/PL2 & Fans</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Real-Time Hardware Telemetry Grid -->
+      <section class="telemetry-grid">
+        <!-- CPU Card -->
+        <div class="telemetry-card">
+          <div class="card-head">
+            <div class="chip-label">
+              <span class="chip-badge">CPU</span>
+              <span class="chip-sub">AMD Ryzen 7</span>
+            </div>
+            <div class="metric-squircle">
+              <span class="metric-value" id="cpu-usage">0</span>
+              <span class="metric-unit">%</span>
+            </div>
+          </div>
+          <div class="metric-rows">
+            <div class="m-row">
+              <span class="m-label">Frequency</span>
+              <span class="m-val" id="cpu-clock">-- GHz</span>
+            </div>
+            <div class="m-row">
+              <span class="m-label">Temperature</span>
+              <span class="m-val" id="cpu-temp">-- °C</span>
+            </div>
+            <div class="m-row">
+              <span class="m-label">Fan 1 (CPU)</span>
+              <span class="m-val" id="cpu-fan">-- RPM</span>
+            </div>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="cpu-progress" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- RAM Card -->
+        <div class="telemetry-card">
+          <div class="card-head">
+            <div class="chip-label">
+              <span class="chip-badge">RAM</span>
+              <span class="chip-sub">DDR5 System Memory</span>
+            </div>
+            <div class="metric-squircle">
+              <span class="metric-value" id="ram-usage-pct">0</span>
+              <span class="metric-unit">%</span>
+            </div>
+          </div>
+          <div class="metric-rows">
+            <div class="m-row">
+              <span class="m-label">Memory In Use</span>
+              <span class="m-val" id="ram-used">-- GB</span>
+            </div>
+            <div class="m-row">
+              <span class="m-label">Total Installed</span>
+              <span class="m-val" id="ram-total">-- GB</span>
+            </div>
+            <div class="m-row">
+              <span class="m-label">Status</span>
+              <span class="m-val text-accent" id="ram-status">Optimized</span>
+            </div>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill fill-ram" id="ram-progress" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- GPU Card -->
+        <div class="telemetry-card">
+          <div class="card-head">
+            <div class="chip-label">
+              <span class="chip-badge">GPU</span>
+              <span class="chip-sub">NVIDIA GeForce RTX</span>
+            </div>
+            <div class="metric-squircle">
+              <span class="metric-value" id="gpu-usage">0</span>
+              <span class="metric-unit">%</span>
+            </div>
+          </div>
+          <div class="metric-rows">
+            <div class="m-row">
+              <span class="m-label">Clock / Power</span>
+              <span class="m-val" id="gpu-clock">-- MHz · -- W</span>
+            </div>
+            <div class="m-row">
+              <span class="m-label">Temperature</span>
+              <span class="m-val" id="gpu-temp">-- °C</span>
+            </div>
+            <div class="m-row">
+              <span class="m-label">Fan 2 (GPU)</span>
+              <span class="m-val" id="gpu-fan">-- RPM</span>
+            </div>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill fill-gpu" id="gpu-progress" style="width: 0%;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Two-Column Controls Grid: Fans & Battery -->
+      <div class="controls-two-col">
+        <!-- Cooling Fan Controls Card -->
+        <section class="section-card fan-card">
+          <div class="section-header compact">
+            <div class="header-text">
+              <h3>Cooling Fans Control</h3>
+              <p>Independent dual blower RPM targets and curves</p>
+            </div>
+            <div class="fan-rpm-badge" id="fan-summary">
+              <span class="fan-icon">🌀</span>
+              <span id="fan-summary-text">Auto · 2700 RPM</span>
+            </div>
+          </div>
+
+          <div class="segmented-mode-bar">
+            <button class="mode-pill active" id="btn-fan-auto" onclick="setFanMode('auto')">Auto Curve</button>
+            <button class="mode-pill" id="btn-fan-full" onclick="setFanMode('full')">Full Turbo (5100)</button>
+            <button class="mode-pill" id="btn-fan-manual" onclick="setFanMode('set')">Manual Target</button>
+          </div>
+
+          <div class="slider-group" id="manual-fan-slider-box">
+            <div class="slider-label-row">
+              <span>Target Fan Speed</span>
+              <span class="slider-val" id="fan-target-display">3500 RPM</span>
+            </div>
+            <input type="range" min="1700" max="5100" step="100" value="3500" class="m3-slider" id="fan-slider" oninput="onFanSliderChange(this.value)">
+            <div class="slider-bounds">
+              <span>1700 RPM (Min)</span>
+              <span>5100 RPM (Max Turbo)</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Battery Health & Conservation Card -->
+        <section class="section-card battery-card">
+          <div class="section-header compact">
+            <div class="header-text">
+              <h3>Battery & Longevity</h3>
+              <p>Hardware battery care and power telemetry</p>
+            </div>
+            <span class="battery-health-tag" id="battery-health-badge">97.4% Health</span>
+          </div>
+
+          <div class="setting-toggle-row">
+            <div class="setting-meta">
+              <span class="setting-name">Conservation Mode</span>
+              <span class="setting-desc">Limits charge to 80% to dramatically extend Li-poly lifespan</span>
+            </div>
+            <label class="m3-switch">
+              <input type="checkbox" id="switch-conservation" onchange="toggleConservation(this.checked)">
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-toggle-row">
+            <div class="setting-meta">
+              <span class="setting-name">Always-On USB Charging</span>
+              <span class="setting-desc">Charge phones & peripherals from rear USB while sleeping</span>
+            </div>
+            <label class="m3-switch">
+              <input type="checkbox" id="switch-usb-charge" onchange="toggleUsbCharge(this.checked)">
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+
+          <div class="battery-stats-row">
+            <div class="b-stat">
+              <span class="b-label">Charge Level</span>
+              <span class="b-val" id="batt-pct">79%</span>
+            </div>
+            <div class="b-stat">
+              <span class="b-label">Charge Status</span>
+              <span class="b-val" id="batt-status">Not charging</span>
+            </div>
+            <div class="b-stat">
+              <span class="b-label">Cycle Count</span>
+              <span class="b-val" id="batt-cycles">266</span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- 4-Zone RGB Lighting Keyboard Card -->
+      <section class="section-card lighting-card">
+        <div class="section-header">
+          <div class="header-text">
+            <h2>4-Zone RGB Keyboard Lighting</h2>
+            <p>Direct ITE 8258 USB HID (048d:c195) 0xCC report controller</p>
+          </div>
+          <div class="fn-lock-box">
+            <span class="fn-lock-label">Fn-Lock</span>
+            <label class="m3-switch small">
+              <input type="checkbox" id="switch-fn-lock" onchange="toggleFnLock(this.checked)">
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Interactive Keyboard Graphic Preview -->
+        <div class="keyboard-preview">
+          <div class="kbd-zone" id="kbd-z1" onclick="selectZone('1')">
+            <span class="zone-label">Zone 1</span>
+            <span class="zone-keys">Q W E A S D</span>
+          </div>
+          <div class="kbd-zone" id="kbd-z2" onclick="selectZone('2')">
+            <span class="zone-label">Zone 2</span>
+            <span class="zone-keys">T Y U G H J</span>
+          </div>
+          <div class="kbd-zone" id="kbd-z3" onclick="selectZone('3')">
+            <span class="zone-label">Zone 3</span>
+            <span class="zone-keys">O P [ K L ;</span>
+          </div>
+          <div class="kbd-zone" id="kbd-z4" onclick="selectZone('4')">
+            <span class="zone-label">Zone 4</span>
+            <span class="zone-keys">NumPad · Enter</span>
+          </div>
+        </div>
+
+        <!-- Preset Chips -->
+        <div class="lighting-controls-row">
+          <div class="preset-group">
+            <span class="control-label">Built-in Presets</span>
+            <div class="chips-row">
+              <button class="chip-btn" onclick="applyPreset('legion-blue')">
+                <span class="chip-dot dot-lblue"></span> Legion Blue
+              </button>
+              <button class="chip-btn" onclick="applyPreset('cyberpunk')">
+                <span class="chip-dot dot-cyber"></span> Cyberpunk
+              </button>
+              <button class="chip-btn" onclick="applyPreset('crimson')">
+                <span class="chip-dot dot-crimson"></span> Crimson
+              </button>
+              <button class="chip-btn" onclick="applyPreset('spectrum')">
+                <span class="chip-dot dot-spectrum"></span> Spectrum Wave
+              </button>
+              <button class="chip-btn chip-stealth" onclick="applyPreset('stealth')">
+                <span class="chip-dot dot-stealth"></span> Stealth (Off)
+              </button>
+            </div>
+          </div>
+
+          <!-- Color & Brightness -->
+          <div class="custom-color-group">
+            <span class="control-label">Custom Zone Color</span>
+            <div class="color-picker-box">
+              <input type="color" id="color-picker" value="#00d3fe" onchange="applyCustomColor(this.value)">
+              <div class="zone-target-pills">
+                <button class="zone-pill active" id="zp-all" onclick="selectZone('all')">All</button>
+                <button class="zone-pill" id="zp-1" onclick="selectZone('1')">Z1</button>
+                <button class="zone-pill" id="zp-2" onclick="selectZone('2')">Z2</button>
+                <button class="zone-pill" id="zp-3" onclick="selectZone('3')">Z3</button>
+                <button class="zone-pill" id="zp-4" onclick="selectZone('4')">Z4</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Advanced Custom Mode Tuning -->
+      <section class="section-card custom-tuning-card">
+        <details class="m3-accordion" id="accordion-custom">
+          <summary class="accordion-header">
+            <div class="accordion-title-col">
+              <h3>Advanced Custom Mode Power Tuning</h3>
+              <p>Tune CPU Sustained (PL1), Short-term (PL2), Fast Peak (PL3) and thermal throttle ceilings</p>
+            </div>
+            <span class="accordion-arrow">▼</span>
+          </summary>
+
+          <div class="custom-grid">
+            <div class="custom-slider-item">
+              <div class="item-head">
+                <span class="item-title">CPU Sustained Power Limit (PL1 / SPL)</span>
+                <span class="item-val" id="val-pl1">70 W</span>
+              </div>
+              <input type="range" min="50" max="85" value="70" class="m3-slider" id="slider-pl1" onchange="applyCustomSetting('ppt_pl1_spl', this.value, 'val-pl1', 'W')">
+              <div class="slider-bounds"><span>50 W</span><span>Default: 70 W</span><span>85 W</span></div>
+            </div>
+
+            <div class="custom-slider-item">
+              <div class="item-head">
+                <span class="item-title">CPU Slow Package Power (PL2 / SPPT)</span>
+                <span class="item-val" id="val-pl2">85 W</span>
+              </div>
+              <input type="range" min="60" max="130" value="85" class="m3-slider" id="slider-pl2" onchange="applyCustomSetting('ppt_pl2_sppt', this.value, 'val-pl2', 'W')">
+              <div class="slider-bounds"><span>60 W</span><span>Default: 85 W</span><span>130 W</span></div>
+            </div>
+
+            <div class="custom-slider-item">
+              <div class="item-head">
+                <span class="item-title">CPU Fast Package Power (PL3 / FPPT)</span>
+                <span class="item-val" id="val-pl3">102 W</span>
+              </div>
+              <input type="range" min="70" max="150" value="102" class="m3-slider" id="slider-pl3" onchange="applyCustomSetting('ppt_pl3_fppt', this.value, 'val-pl3', 'W')">
+              <div class="slider-bounds"><span>70 W</span><span>Default: 102 W</span><span>150 W</span></div>
+            </div>
+
+            <div class="custom-slider-item">
+              <div class="item-head">
+                <span class="item-title">CPU Max Thermal Load Limit</span>
+                <span class="item-val" id="val-cpu-temp">100 °C</span>
+              </div>
+              <input type="range" min="85" max="100" value="100" class="m3-slider" id="slider-cpu-temp" onchange="applyCustomSetting('cpu_temp', this.value, 'val-cpu-temp', '°C')">
+              <div class="slider-bounds"><span>85 °C</span><span>Default: 100 °C</span><span>100 °C</span></div>
+            </div>
+          </div>
+        </details>
+      </section>
+    </main>
+
+    <!-- Toast Notification Banner -->
+    <div class="toast-container" id="toast-container"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

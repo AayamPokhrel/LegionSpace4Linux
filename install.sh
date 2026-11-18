@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# All-In-One Automated Installer for Lenovo Legion Linux Suite (v0.9.0)
+# All-In-One Automated Installer for Lenovo Legion Linux Suite (v1.0.0)
 # Hardware: Lenovo Legion Pro 5 16ADR10 (Product 83LT)
 # ==============================================================================
 set -euo pipefail
@@ -15,7 +15,7 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 echo -e "${CYAN}${BOLD}========================================================================${NC}"
-echo -e "${CYAN}${BOLD}   Lenovo Legion Pro 5 16ADR10 Automated Root Installer (v0.9.0)      ${NC}"
+echo -e "${CYAN}${BOLD}   Lenovo Legion Pro 5 16ADR10 Automated Root Installer (v1.0.0)      ${NC}"
 echo -e "${CYAN}${BOLD}========================================================================${NC}"
 
 # Check for root privilege
@@ -51,22 +51,44 @@ else
 fi
 
 # ------------------------------------------------------------------------------
-# 2. Install Executables into User & System PATH
+# 2. Install Executables & Desktop GUI into User & System PATH
 # ------------------------------------------------------------------------------
-echo -e "${CYAN}${BOLD}[2/5] Installing binaries into PATH...${NC}"
-mkdir -p /usr/local/bin
+echo -e "${CYAN}${BOLD}[2/5] Installing CLI binaries and Material You GUI...${NC}"
+mkdir -p /usr/local/bin /usr/local/share/applications /usr/local/share/icons/hicolor/scalable/apps /usr/local/share/legionspace
 cp "${REPO_DIR}/legion-cli/target/release/legion-cli" /usr/local/bin/legion-cli
 cp "${REPO_DIR}/legion-cli/target/release/legionctl" /usr/local/bin/legionctl
+if [ -f "${REPO_DIR}/bin/legionspace" ]; then
+    cp "${REPO_DIR}/bin/legionspace" /usr/local/bin/legionspace
+    cp "${REPO_DIR}/bin/legionspace" /usr/local/bin/legion-gui
+    chmod 755 /usr/local/bin/legionspace /usr/local/bin/legion-gui
+fi
+if [ -f "${REPO_DIR}/desktop/legion-space.desktop" ]; then
+    cp "${REPO_DIR}/desktop/legion-space.desktop" /usr/local/share/applications/
+fi
+if [ -f "${REPO_DIR}/desktop/legion-space.svg" ]; then
+    cp "${REPO_DIR}/desktop/legion-space.svg" /usr/local/share/icons/hicolor/scalable/apps/
+fi
 chmod 755 /usr/local/bin/legion-cli /usr/local/bin/legionctl
 
 if [ -d "${REAL_HOME}" ]; then
-    mkdir -p "${REAL_HOME}/.local/bin"
+    mkdir -p "${REAL_HOME}/.local/bin" "${REAL_HOME}/.local/share/applications" "${REAL_HOME}/.local/share/icons/hicolor/scalable/apps"
     cp "${REPO_DIR}/legion-cli/target/release/legion-cli" "${REAL_HOME}/.local/bin/legion-cli"
     cp "${REPO_DIR}/legion-cli/target/release/legionctl" "${REAL_HOME}/.local/bin/legionctl"
+    if [ -f "${REPO_DIR}/bin/legionspace" ]; then
+        cp "${REPO_DIR}/bin/legionspace" "${REAL_HOME}/.local/bin/legionspace"
+        cp "${REPO_DIR}/bin/legionspace" "${REAL_HOME}/.local/bin/legion-gui"
+        chmod 755 "${REAL_HOME}/.local/bin/legionspace" "${REAL_HOME}/.local/bin/legion-gui"
+    fi
+    if [ -f "${REPO_DIR}/desktop/legion-space.desktop" ]; then
+        cp "${REPO_DIR}/desktop/legion-space.desktop" "${REAL_HOME}/.local/share/applications/"
+    fi
+    if [ -f "${REPO_DIR}/desktop/legion-space.svg" ]; then
+        cp "${REPO_DIR}/desktop/legion-space.svg" "${REAL_HOME}/.local/share/icons/hicolor/scalable/apps/"
+    fi
     chmod 755 "${REAL_HOME}/.local/bin/legion-cli" "${REAL_HOME}/.local/bin/legionctl"
-    chown "${REAL_USER}:" "${REAL_HOME}/.local/bin/legion-cli" "${REAL_HOME}/.local/bin/legionctl"
+    chown -R "${REAL_USER}:" "${REAL_HOME}/.local/bin" "${REAL_HOME}/.local/share/applications/legion-space.desktop" "${REAL_HOME}/.local/share/icons/hicolor/scalable/apps/legion-space.svg" 2>/dev/null || true
 fi
-echo -e "      ${GREEN}[OK] Installed /usr/local/bin/legionctl and ~/.local/bin/legionctl${NC}"
+echo -e "      ${GREEN}[OK] Installed legionctl, legion-cli, and legionspace GUI desktop app${NC}"
 
 # ------------------------------------------------------------------------------
 # 3. Setup udev Rules
@@ -202,8 +224,9 @@ echo ""
 echo -e "${GREEN}${BOLD}========================================================================${NC}"
 echo -e "${GREEN}${BOLD}   Installation Complete! Everything is Fully Automated!              ${NC}"
 echo -e "${GREEN}${BOLD}========================================================================${NC}"
-echo -e "You can now run ${CYAN}${BOLD}legionctl${NC} or ${CYAN}${BOLD}legion-cli${NC} without sudo:"
+echo -e "You can now run ${CYAN}${BOLD}legionctl${NC} or launch the ${CYAN}${BOLD}Legion Space Material You GUI${NC}:"
 echo ""
+echo -e "  ${BOLD}legionspace${NC}                          # Launch Material You desktop GUI app"
 echo -e "  ${BOLD}legionctl status${NC}                     # Show full live hardware dashboard"
 echo -e "  ${BOLD}legionctl profile set balanced${NC}       # Switch thermal profile (Quiet/Balanced/Perf)"
 echo -e "  ${BOLD}legionctl fan set --both 4000${NC}        # Set manual fan speed"
@@ -211,5 +234,6 @@ echo -e "  ${BOLD}legionctl fan auto${NC}                   # Restore automatic 
 echo -e "  ${BOLD}legionctl battery conservation on${NC}    # Limit charge to 80% for longevity"
 echo -e "  ${BOLD}legionctl lighting preset cyberpunk${NC}  # 4-Zone RGB keyboard lighting"
 echo ""
+echo -e "You can also search '${BOLD}Legion Space${NC}' in your GNOME/KDE application launcher."
 echo -e "All hardware interfaces are permanently configured for unprivileged access."
 echo -e "${GREEN}${BOLD}========================================================================${NC}"

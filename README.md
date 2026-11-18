@@ -90,6 +90,27 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 
 ---
 
+## Material You Desktop Application (`legionspace`)
+
+Version 1.0.0 introduces **Legion Space**, a standalone desktop GUI application designed with Google's **Material 3 Expressive (Material You)** design philosophy.
+
+- **Real-time Live Telemetry**: Live CPU, GPU, and DDR5 RAM utilization, clock frequencies (GHz), temperatures (°C), and dual-fan RPM telemetry.
+- **ACPI Thermal Profile Selector**: Segmented pill selectors for Quiet, Balanced, Performance, and Custom modes with physical power button LED synchronization.
+- **Cooling Fans Management**: Automatic firmware curve restore, 5100 RPM full turbo boost, and manual RPM slider (1700–5100 RPM).
+- **Battery Care**: One-click toggles for Battery Conservation Mode (80% charge threshold limiter) and Always-On USB charging.
+- **Interactive 4-Zone RGB Lighting**: Interactive 4-zone keyboard representation, preset switcher (Legion Blue, Cyberpunk, Crimson, Spectrum, Stealth), custom hex color picker, brightness, and Fn-Lock toggles.
+- **Advanced Power Tuning**: Custom PL1/PL2/PL3 power limit sliders and thermal throttle adjustments.
+
+To launch the desktop GUI:
+```bash
+# Launch directly from terminal:
+legionspace
+
+# Or search "Legion Space" in GNOME / KDE Application launcher
+```
+
+---
+
 ## Command Reference & Usage
 
 Both binary names `legion-cli` and `legionctl` are available.
@@ -240,6 +261,7 @@ legion-cli lighting off
 | **`v0.7.0`** | Unified CLI & Telemetry | Comprehensive status overview dashboard, interactive CLI commands, and machine-readable JSON output. |
 | **`v0.8.0`** | udev Permissions | udev rules (`MODE="0666", TAG+="uaccess"`) for unprivileged non-root hardware access. |
 | **`v0.9.0`** | Packaging & Automation | Nix flake, NixOS module, build scripts, and automated root installer with `--impure` support. |
+| **`v1.0.0`** | Material You Desktop GUI | Complete Material 3 Expressive standalone desktop GUI app (`legionspace`), real-time hardware telemetry gauges, interactive 4-zone RGB visualizer, and desktop launcher. |
 
 ---
 

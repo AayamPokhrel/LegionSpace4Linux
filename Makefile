@@ -37,11 +37,15 @@ install:
 	@./install.sh
 
 install-user: build
-	@echo "==> Installing binaries to $(HOME)/.local/bin..."
-	install -d $(HOME)/.local/bin
+	@echo "==> Installing binaries & GUI launcher to $(HOME)/.local/bin..."
+	install -d $(HOME)/.local/bin $(HOME)/.local/share/applications $(HOME)/.local/share/icons/hicolor/scalable/apps
 	install -m 755 $(TARGET_DIR)/legion-cli $(HOME)/.local/bin/legion-cli
 	install -m 755 $(TARGET_DIR)/legionctl $(HOME)/.local/bin/legionctl
-	@echo "==> Binaries installed to $(HOME)/.local/bin"
+	install -m 755 bin/legionspace $(HOME)/.local/bin/legionspace
+	install -m 755 bin/legionspace $(HOME)/.local/bin/legion-gui
+	install -m 644 desktop/legion-space.desktop $(HOME)/.local/share/applications/legion-space.desktop
+	install -m 644 desktop/legion-space.svg $(HOME)/.local/share/icons/hicolor/scalable/apps/legion-space.svg
+	@echo "==> Binaries & Legion Space GUI installed to $(HOME)/.local/bin"
 	@echo ""
 	@echo "To install udev rules for unprivileged hardware control, run:"
 	@echo "  sudo cp $(UDEV_RULE) /etc/udev/rules.d/"
