@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "legion-cli",
+    "legion-gui",
+]
+resolver = "2"

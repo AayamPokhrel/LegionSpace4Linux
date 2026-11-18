@@ -15,20 +15,25 @@
     in
     {
       packages = forAllSystems (system: pkgs: {
-        legion-cli = pkgs.callPackage ./nix/package.nix { };
-        default = self.packages.${system}.legion-cli;
+        legionspace = pkgs.callPackage ./nix/package.nix { };
+        legion-cli = self.packages.${system}.legionspace;
+        default = self.packages.${system}.legionspace;
       });
 
       apps = forAllSystems (system: pkgs: {
-        legion-cli = {
+        legionspace = {
           type = "app";
-          program = "${self.packages.${system}.legion-cli}/bin/legion-cli";
+          program = "${self.packages.${system}.legionspace}/bin/legionspace";
         };
         legionctl = {
           type = "app";
-          program = "${self.packages.${system}.legion-cli}/bin/legionctl";
+          program = "${self.packages.${system}.legionspace}/bin/legionctl";
         };
-        default = self.apps.${system}.legion-cli;
+        legion-cli = {
+          type = "app";
+          program = "${self.packages.${system}.legionspace}/bin/legion-cli";
+        };
+        default = self.apps.${system}.legionspace;
       });
 
       devShells = forAllSystems (system: pkgs: {
@@ -39,6 +44,10 @@
             clippy
             rustfmt
             rust-analyzer
+            pkg-config
+            wayland
+            libxkbcommon
+            libGL
           ];
         };
       });
@@ -49,6 +58,7 @@
       };
 
       overlays.default = final: prev: {
+        legionspace = final.callPackage ./nix/package.nix { };
         legion-cli = final.callPackage ./nix/package.nix { };
       };
     };

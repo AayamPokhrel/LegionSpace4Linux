@@ -1,38 +1,75 @@
-{ lib, rustPlatform }:
+{ lib
+, rustPlatform
+, pkg-config
+, makeWrapper
+, wayland
+, libxkbcommon
+, libGL
+, vulkan-loader
+, libx11
+, libxcursor
+, libxrandr
+, libxi
+}:
 
 rustPlatform.buildRustPackage {
-  pname = "legion-cli";
+  pname = "legionspace";
   version = "1.4.0";
 
-  src = ../legion-cli;
+  src = lib.cleanSource ../.;
 
   cargoLock = {
-    lockFile = ../legion-cli/Cargo.lock;
+    lockFile = ../Cargo.lock;
   };
 
+  nativeBuildInputs = [
+    pkg-config
+    makeWrapper
+  ];
+
+  buildInputs = [
+    wayland
+    libxkbcommon
+    libGL
+    vulkan-loader
+    libx11
+    libxcursor
+    libxrandr
+    libxi
+  ];
+
   postInstall = ''
-    mkdir -p $out/lib/udev/rules.d $out/bin $out/share/applications $out/share/icons/hicolor/scalable/apps
-    cp udev/99-lenovo-legion.rules $out/lib/udev/rules.d/99-lenovo-legion.rules
-    if [ -f ../bin/legionspace ]; then
-      cp ../bin/legionspace $out/bin/legionspace
-      cp ../bin/legionspace $out/bin/legion-gui
-      chmod +x $out/bin/legionspace $out/bin/legion-gui
-    fi
-    if [ -f ../desktop/legion-space.desktop ]; then
-      cp ../desktop/legion-space.desktop $out/share/applications/
-    fi
-    if [ -f ../desktop/legion-space.svg ]; then
-      cp ../desktop/legion-space.svg $out/share/icons/hicolor/scalable/apps/
-    fi
+    # Install udev rules for unprivileged hardware control
+    install -Dm644 -t $out/lib/udev/rules.d/ udev/99-lenovo-legion.rules
+
+    # Install Freedesktop .desktop entry
+    install -Dm644 desktop/legion-space.desktop $out/share/applications/legion-space.desktop
+
+    # Install scalable SVG icon
+    install -Dm644 desktop/legion-space.svg $out/share/icons/hicolor/scalable/apps/legion-space.svg
+
+    # Create convenient symlink for legion-gui
+    ln -sf $out/bin/legionspace $out/bin/legion-gui
+
+    # Wrap GUI with runtime Wayland, OpenGL, and X11 graphics libraries
+    wrapProgram $out/bin/legionspace \
+      --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [
+        wayland
+        libxkbcommon
+        libGL
+        vulkan-loader
+        libx11
+        libxcursor
+        libxrandr
+        libxi
+      ]}
   '';
 
   meta = with lib; {
-    description = "Native Linux hardware control utility for Lenovo Legion laptops (Pro 5 16ADR10)";
+    description = "Native Linux hardware driver, CLI utility, and Material You GUI for Lenovo Legion Pro 5";
     homepage = "https://github.com/AayamPokhrel/LegionSpace4Linux";
     license = licenses.mit;
-    maintainers = [ ];
     platforms = platforms.linux;
-    mainProgram = "legion-cli";
+    mainProgram = "legionspace";
   };
 }
-

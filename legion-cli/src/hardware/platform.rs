@@ -91,3 +91,4 @@ pub fn set_camera_power(enable: bool) -> Result<bool> {
 
     get_camera_power()
 }
+
