@@ -50,6 +50,9 @@ pub enum Commands {
     #[command(about = "Manage NVIDIA discrete GPU telemetry, TGP limits, and clocks")]
     Gpu(GpuCmd),
 
+    #[command(about = "Manage hardware camera e-shutter privacy switch")]
+    Camera(CameraCmd),
+
     #[command(
         alias = "rgb",
         about = "Control 4-zone RGB lighting, ACPI backlight, and Fn-Lock"
@@ -257,6 +260,15 @@ pub enum GpuAction {
 
     #[command(about = "Reset GPU graphics core clocks to automatic driver management")]
     ResetClocks,
+}
+
+// ----------------------------------------------------------------------------
+// Camera Subcommands
+// ----------------------------------------------------------------------------
+#[derive(Args, Debug)]
+pub struct CameraCmd {
+    #[arg(help = "State: on/enable/1 or off/disable/0")]
+    pub state: Option<ToggleState>,
 }
 
 // ----------------------------------------------------------------------------

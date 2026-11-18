@@ -1,4 +1,4 @@
-use crate::hardware::{battery, custom_mode, fan, gpu, lighting, probe, thermal};
+use crate::hardware::{battery, custom_mode, fan, gpu, lighting, platform, probe, thermal};
 use colored::*;
 use serde::{Deserialize, Serialize};
 
@@ -9,6 +9,7 @@ pub struct LegionFullStatus {
     pub fans: Option<fan::FanSystemStatus>,
     pub gpu: Option<gpu::GpuTelemetry>,
     pub battery: Option<battery::BatteryDetails>,
+    pub platform: platform::PlatformFeatures,
     pub lighting: Option<lighting::LightingStatus>,
     pub custom: Option<custom_mode::CustomModeConfig>,
 }
@@ -19,6 +20,7 @@ pub fn get_full_status() -> LegionFullStatus {
     let fans = fan::get_fan_status().ok();
     let gpu = gpu::get_gpu_telemetry().ok();
     let battery = battery::get_battery_details().ok();
+    let platform = platform::get_platform_features();
     let lighting = lighting::get_lighting_status().ok();
     let custom = custom_mode::get_custom_mode_config().ok();
 
@@ -28,6 +30,7 @@ pub fn get_full_status() -> LegionFullStatus {
         fans,
         gpu,
         battery,
+        platform,
         lighting,
         custom,
     }
@@ -171,6 +174,14 @@ pub fn print_full_status(status: &LegionFullStatus) {
         }
         if let Some(fn_l) = l.fn_lock {
             println!("  Fn-Lock:           {}", if fn_l { "Enabled".green() } else { "Disabled".white() });
+        }
+        if let Some(cam) = status.platform.camera_power {
+            let cam_str = if cam {
+                "Enabled (Hardware shutter open)".green()
+            } else {
+                "Disabled (Hardware e-shutter active)".yellow()
+            };
+            println!("  Camera E-Shutter:  {}", cam_str);
         }
         println!(
             "  RGB Controller:    {}",

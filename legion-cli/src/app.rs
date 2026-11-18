@@ -1,6 +1,6 @@
 use crate::cli::*;
 use crate::error::{LegionError, Result};
-use crate::hardware::{battery, custom_mode, fan, gpu, lighting, probe, thermal};
+use crate::hardware::{battery, custom_mode, fan, gpu, lighting, platform, probe, thermal};
 use crate::status;
 use colored::*;
 use serde::Serialize;
@@ -63,6 +63,7 @@ fn dispatch(cli: &Cli) -> Result<()> {
         Some(Commands::Battery(cmd)) => handle_battery(cmd, cli.json),
         Some(Commands::Custom(cmd)) => handle_custom(cmd, cli.json),
         Some(Commands::Gpu(cmd)) => handle_gpu(cmd, cli.json),
+        Some(Commands::Camera(cmd)) => handle_camera(cmd, cli.json),
         Some(Commands::Lighting(cmd)) => handle_lighting(cmd, cli.json),
     }
 }
@@ -562,6 +563,44 @@ fn handle_gpu(cmd: &GpuCmd, json: bool) -> Result<()> {
                 println!("{}", serde_json::json!({"success": true, "reset_clocks": true}));
             } else {
                 println!("{} Reset GPU clocks to automatic management.", "[OK]".green().bold());
+            }
+        }
+    }
+    Ok(())
+}
+
+// ----------------------------------------------------------------------------
+// Camera Handlers
+// ----------------------------------------------------------------------------
+fn handle_camera(cmd: &CameraCmd, json: bool) -> Result<()> {
+    match cmd.state {
+        Some(st) => {
+            let enable = st.is_enabled();
+            let updated = platform::set_camera_power(enable)?;
+            if json {
+                let resp = ActionResponse {
+                    success: true,
+                    action: "camera_power_set",
+                    data: updated,
+                };
+                println!("{}", serde_json::to_string_pretty(&resp).unwrap());
+            } else {
+                println!(
+                    "{} Camera e-shutter power: {}",
+                    "[OK]".green().bold(),
+                    if updated { "Enabled (shutter open)".green() } else { "Disabled (shutter killed)".yellow() }
+                );
+            }
+        }
+        None => {
+            let state = platform::get_camera_power()?;
+            if json {
+                println!("{}", serde_json::json!({"camera_power": state}));
+            } else {
+                println!(
+                    "Camera hardware e-shutter is currently: {}",
+                    if state { "Enabled (shutter open)".green().bold() } else { "Disabled (shutter killed)".yellow().bold() }
+                );
             }
         }
     }
