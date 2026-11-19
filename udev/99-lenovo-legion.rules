@@ -8,6 +8,7 @@
 #  - Cooling Fan Targets (Fan 1 CPU, Fan 2 GPU)
 #  - Battery Conservation Mode (80% charge threshold) & Always-On USB
 #  - Custom Mode Firmware Attributes (PL1, PL2, PL3, CPU/GPU thermal limits)
+#  - Integrated Camera Hardware E-Shutter & USB authorization
 # ==============================================================================
 
 # 1. ITE 8258 RGB USB HID Device (048d:c195)
@@ -19,9 +20,12 @@ SUBSYSTEM=="platform-profile", KERNEL=="platform-profile*", MODE="0666", TAG+="u
 # 3. Cooling Fan Speed Targets via lenovo_wmi_other HWMON
 SUBSYSTEM=="hwmon", ATTR{name}=="lenovo_wmi_other", MODE="0666", TAG+="uaccess", RUN+="/bin/sh -c 'chmod 0666 /sys%p/fan1_target /sys%p/fan2_target 2>/dev/null || true'"
 
-# 4. Lenovo Ideapad / VPC2004 ACPI Platform Device (Battery Conservation, Fn-Lock, Fan Mode, USB Charging)
-SUBSYSTEM=="platform", DRIVER=="ideapad_acpi", MODE="0666", TAG+="uaccess", RUN+="/bin/sh -c 'chmod 0666 /sys%p/conservation_mode /sys%p/usb_charging /sys%p/fn_lock /sys%p/fan_mode /sys%p/leds/platform::kbd_backlight/brightness 2>/dev/null || true'"
+# 4. Lenovo Ideapad / VPC2004 ACPI Platform Device (Battery Conservation, Fn-Lock, Fan Mode, USB Charging, Camera Power)
+SUBSYSTEM=="platform", DRIVER=="ideapad_acpi", MODE="0666", TAG+="uaccess", RUN+="/bin/sh -c 'chmod 0666 /sys%p/conservation_mode /sys%p/usb_charging /sys%p/camera_power /sys%p/fn_lock /sys%p/fan_mode /sys%p/leds/platform::kbd_backlight/brightness 2>/dev/null || true'"
 
 # 5. Lenovo WMI Custom Mode Firmware Attributes
 SUBSYSTEM=="firmware-attributes", KERNEL=="lenovo-wmi-other*", MODE="0666", TAG+="uaccess", RUN+="/bin/sh -c 'chmod 0666 /sys%p/attributes/*/current_value 2>/dev/null || true'"
 
+# 6. Integrated Camera E-Shutter & USB device control
+SUBSYSTEM=="usb", ATTRS{idVendor}=="174f", TEST=="authorized", MODE="0666", TAG+="uaccess", RUN+="/bin/sh -c 'chmod 0666 /sys%p/authorized 2>/dev/null || true'"
+SUBSYSTEM=="video4linux", KERNEL=="video*", MODE="0666", TAG+="uaccess"
