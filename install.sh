@@ -42,30 +42,19 @@ echo ""
 echo -e "${CYAN}${BOLD}[1/5] Checking release binaries (legion-cli, legionctl, legionspace)...${NC}"
 cd "${REPO_DIR}"
 
-CLI_BIN="${REPO_DIR}/legion-cli/target/release/legion-cli"
-CTL_BIN="${REPO_DIR}/legion-cli/target/release/legionctl"
-GUI_BIN="${REPO_DIR}/legion-gui/target/release/legionspace"
+CLI_BIN="${REPO_DIR}/target/release/legion-cli"
+CTL_BIN="${REPO_DIR}/target/release/legionctl"
+GUI_BIN="${REPO_DIR}/target/release/legionspace"
 
-if [ ! -f "$CLI_BIN" ] || [ ! -f "$CTL_BIN" ]; then
-    echo -e "      Compiling CLI via Cargo..."
+if [ ! -f "$CLI_BIN" ] || [ ! -f "$CTL_BIN" ] || [ ! -f "$GUI_BIN" ]; then
+    echo -e "      Compiling release binaries via Cargo..."
     if command -v cargo &>/dev/null; then
-        (cd legion-cli && cargo build --release)
+        cargo build --release
     else
-        nix-shell -p cargo rustc --run "cd legion-cli && cargo build --release"
+        nix-shell -p cargo rustc pkg-config wayland libxkbcommon libGL --run "cargo build --release"
     fi
 else
-    echo -e "      ${GREEN}[OK] Pre-compiled CLI binaries found and ready.${NC}"
-fi
-
-if [ ! -f "$GUI_BIN" ]; then
-    echo -e "      Compiling Material You GUI via Cargo..."
-    if command -v cargo &>/dev/null; then
-        (cd legion-gui && cargo build --release)
-    else
-        nix-shell -p cargo rustc pkg-config wayland libxkbcommon libGL --run "cd legion-gui && cargo build --release"
-    fi
-else
-    echo -e "      ${GREEN}[OK] Pre-compiled native Rust GUI binary found and ready.${NC}"
+    echo -e "      ${GREEN}[OK] Pre-compiled release binaries found and ready.${NC}"
 fi
 
 # ------------------------------------------------------------------------------
