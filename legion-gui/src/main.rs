@@ -1,4 +1,4 @@
-use eframe::egui::{self, Color32, Frame, Margin, ProgressBar, RichText, Rounding, Stroke, Vec2};
+use eframe::egui::{self, Color32, Frame, Margin, Pos2, Rect, RichText, Rounding, Stroke, Vec2};
 use legion_cli::hardware::{
     battery::{self, BatteryDetails},
     custom_mode::{self, CustomModeConfig},
@@ -15,40 +15,39 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 // ==============================================================================
-// Material 3 Expressive Design Tokens & Accessible Dark Palette
-// High contrast, expressive surfaces, and authentic Material You hierarchy
+// Material 3 Expressive (M3E) Design Tokens & Palette
+// Authentic Google Material You color roles, tonal surfaces, and elevation
 // ==============================================================================
-const COLOR_BG: Color32 = Color32::from_rgb(16, 17, 21); // #101115 Deep Background
-const COLOR_SURFACE: Color32 = Color32::from_rgb(23, 24, 30); // #17181E Surface Container Low
-const COLOR_CONTAINER: Color32 = Color32::from_rgb(30, 31, 39); // #1E1F27 Surface Container
-const COLOR_CONTAINER_HIGH: Color32 = Color32::from_rgb(41, 42, 53); // #292A35 Surface Container High
-#[allow(dead_code)]
-const COLOR_CONTAINER_HIGHEST: Color32 = Color32::from_rgb(52, 54, 67); // #343643
+const COLOR_SURFACE_DIM: Color32 = Color32::from_rgb(17, 18, 23); // #111217 Base background
+const COLOR_SURFACE: Color32 = Color32::from_rgb(20, 21, 28); // #14151C Surface
+const COLOR_CONTAINER_LOW: Color32 = Color32::from_rgb(26, 27, 36); // #1A1B24 Nav Rail & subtle cards
+const COLOR_CONTAINER: Color32 = Color32::from_rgb(33, 34, 46); // #21222E Standard Cards
+const COLOR_CONTAINER_HIGH: Color32 = Color32::from_rgb(42, 44, 58); // #2A2C3A Elevated elements
+const COLOR_CONTAINER_HIGHEST: Color32 = Color32::from_rgb(53, 55, 73); // #353749 Slider tracks & chips
 
-// Accents & Typography (Tonal Palette)
-const COLOR_PRIMARY: Color32 = Color32::from_rgb(208, 188, 255); // #D0BCFF Soft Lavender / Violet
-const COLOR_ON_PRIMARY: Color32 = Color32::from_rgb(56, 30, 114); // #381E72 Deep Violet (Text inside primary button)
-const COLOR_PRIMARY_CONTAINER: Color32 = Color32::from_rgb(79, 55, 139); // #4F378B Primary Tonal Fill
+// Material 3 Tonal Accents
+const COLOR_PRIMARY: Color32 = Color32::from_rgb(208, 188, 255); // #D0BCFF Lavender (Primary Accent)
+const COLOR_ON_PRIMARY: Color32 = Color32::from_rgb(56, 30, 114); // #381E72 Deep Violet (On Primary)
+const COLOR_PRIMARY_CONTAINER: Color32 = Color32::from_rgb(79, 55, 139); // #4F378B Active item fill
 const COLOR_ON_PRIMARY_CONTAINER: Color32 = Color32::from_rgb(234, 221, 255); // #EADDFF
+
 const COLOR_SECONDARY: Color32 = Color32::from_rgb(204, 194, 220); // #CCC2DC
+#[allow(dead_code)]
+const COLOR_TERTIARY: Color32 = Color32::from_rgb(239, 184, 200); // #EFB8C8
 const COLOR_TEAL: Color32 = Color32::from_rgb(128, 203, 196); // #80CBC4
 
-// High-Contrast Readable Text Tokens
-const COLOR_TEXT_HEADLINE: Color32 = Color32::from_rgb(243, 239, 245); // #F3EFF5 Crisp Off-White (100% Readable)
+// High-Contrast Readable Typography Tokens
+const COLOR_TEXT_HEADLINE: Color32 = Color32::from_rgb(243, 239, 245); // #F3EFF5 Crisp Off-White
 const COLOR_TEXT_BODY: Color32 = Color32::from_rgb(202, 196, 208); // #CAC4D0 On-Surface Variant
-const COLOR_TEXT_MUTED: Color32 = Color32::from_rgb(155, 151, 162); // #9B97A2 Secondary Information
+const COLOR_TEXT_MUTED: Color32 = Color32::from_rgb(155, 151, 163); // #9B97A3 Secondary Info
 
-// Subtle Borders (Tonal definition without wireframes)
-const COLOR_BORDER_SUBTLE: Color32 = Color32::from_rgba_premultiplied(255, 255, 255, 12);
-const COLOR_BORDER_FOCUS: Color32 = Color32::from_rgba_premultiplied(208, 188, 255, 60);
-
-// Hardware LED & Thermal Profile Accents
-const COLOR_QUIET: Color32 = Color32::from_rgb(100, 181, 246); // Blue LED
-const COLOR_BALANCED: Color32 = Color32::from_rgb(245, 245, 247); // White LED
-const COLOR_PERF: Color32 = Color32::from_rgb(255, 110, 110); // Red LED
-const COLOR_CUSTOM: Color32 = Color32::from_rgb(217, 128, 250); // Purple LED
-const COLOR_SUCCESS: Color32 = Color32::from_rgb(129, 199, 132); // Green
-const COLOR_WARNING: Color32 = Color32::from_rgb(255, 183, 77); // Amber
+// Thermal Mode Accents & Status Indicators
+const COLOR_QUIET: Color32 = Color32::from_rgb(100, 181, 246); // #64B5F6 Soft Sky Blue
+const COLOR_BALANCED: Color32 = Color32::from_rgb(245, 245, 247); // Pure White
+const COLOR_PERF: Color32 = Color32::from_rgb(255, 110, 110); // #FF6E6E Coral Red
+const COLOR_CUSTOM: Color32 = Color32::from_rgb(217, 128, 250); // #D980FA Neon Orchid
+const COLOR_SUCCESS: Color32 = Color32::from_rgb(129, 199, 132); // #81C784 Mint Green
+const COLOR_WARNING: Color32 = Color32::from_rgb(255, 183, 77); // #FFB74D Amber
 
 // ==============================================================================
 // Vector Graphics & Icon Painters (Zero Missing Glyphs / Tofu Proof)
@@ -65,21 +64,225 @@ fn draw_legion_badge(ui: &mut egui::Ui, size: f32) {
     let painter = ui.painter();
 
     // Squircle container base
-    painter.rect_filled(rect, Rounding::same(size * 0.28), COLOR_CONTAINER_HIGH);
-    painter.rect_stroke(rect, Rounding::same(size * 0.28), Stroke::new(1.0_f32, COLOR_PRIMARY));
+    painter.rect_filled(rect, Rounding::same(size * 0.3), COLOR_CONTAINER_HIGH);
+    painter.rect_stroke(rect, Rounding::same(size * 0.3), Stroke::new(1.0_f32, COLOR_PRIMARY));
 
     // Three-spoke star emblem
     for angle_deg in [-90.0f32, 30.0f32, 150.0f32] {
         let rad = angle_deg.to_radians();
         let end = center + Vec2::new(rad.cos(), rad.sin()) * (r * 0.82);
-        painter.line_segment([center, end], Stroke::new(2.2_f32, COLOR_PRIMARY));
+        painter.line_segment([center, end], Stroke::new(2.4_f32, COLOR_PRIMARY));
     }
-    painter.circle_filled(center, r * 0.22, COLOR_BG);
+    painter.circle_filled(center, r * 0.22, COLOR_SURFACE_DIM);
     painter.circle_stroke(center, r * 0.22, Stroke::new(1.2_f32, COLOR_PRIMARY));
 }
 
 // ==============================================================================
-// Telemetry State & Live Sensor Readers
+// Custom Material 3 Expressive Widgets
+// ==============================================================================
+
+/// Material 3 Expressive Stadium Switch (52x32dp with animated thumb & checkmark)
+fn m3_switch(ui: &mut egui::Ui, value: &mut bool) -> bool {
+    let desired_size = Vec2::new(52.0, 32.0);
+    let (rect, mut response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
+    if response.clicked() {
+        *value = !*value;
+        response.mark_changed();
+    }
+
+    let painter = ui.painter();
+    let is_on = *value;
+    let track_rounding = Rounding::same(16.0);
+
+    let track_color = if is_on {
+        COLOR_PRIMARY
+    } else {
+        COLOR_CONTAINER_HIGHEST
+    };
+    painter.rect_filled(rect, track_rounding, track_color);
+
+    if !is_on {
+        painter.rect_stroke(rect, track_rounding, Stroke::new(1.5_f32, COLOR_TEXT_MUTED));
+    }
+
+    let thumb_radius = if is_on { 11.5 } else { 8.0 };
+    let thumb_center_x = if is_on {
+        rect.max.x - 16.0
+    } else {
+        rect.min.x + 16.0
+    };
+    let thumb_center = Pos2::new(thumb_center_x, rect.center().y);
+    let thumb_color = if is_on {
+        COLOR_ON_PRIMARY
+    } else {
+        COLOR_TEXT_BODY
+    };
+
+    painter.circle_filled(thumb_center, thumb_radius, thumb_color);
+
+    if is_on {
+        let p1 = thumb_center + Vec2::new(-4.0, 0.0);
+        let p2 = thumb_center + Vec2::new(-1.0, 3.0);
+        let p3 = thumb_center + Vec2::new(4.5, -3.5);
+        painter.line_segment([p1, p2], Stroke::new(2.0_f32, COLOR_PRIMARY));
+        painter.line_segment([p2, p3], Stroke::new(2.0_f32, COLOR_PRIMARY));
+    }
+
+    response.changed()
+}
+
+/// Material 3 Expressive Slider core implementation
+fn m3_slider_f64(
+    ui: &mut egui::Ui,
+    value: &mut f64,
+    range: std::ops::RangeInclusive<f64>,
+    suffix: &str,
+    label: &str,
+    accent: Color32,
+) -> bool {
+    let min_f = *range.start();
+    let max_f = *range.end();
+    let cur_f = *value;
+    let ratio = ((cur_f - min_f) / (max_f - min_f)).clamp(0.0, 1.0) as f32;
+
+    let mut changed = false;
+
+    ui.vertical(|ui| {
+        // Label & Value Chip Header
+        ui.horizontal(|ui| {
+            ui.label(RichText::new(label).size(13.0).strong().color(COLOR_TEXT_HEADLINE));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let badge_text = format!("{:.0} {}", cur_f, suffix);
+                let badge_frame = Frame::none()
+                    .fill(COLOR_CONTAINER_HIGHEST)
+                    .rounding(Rounding::same(9999.0))
+                    .inner_margin(Margin::symmetric(10.0, 3.0));
+                badge_frame.show(ui, |ui| {
+                    ui.label(RichText::new(badge_text).size(12.0).strong().color(accent));
+                });
+            });
+        });
+
+        ui.add_space(6.0);
+
+        // Expressive Pill Track
+        let track_height = 14.0_f32;
+        let (rect, response) = ui.allocate_exact_size(
+            Vec2::new(ui.available_width(), track_height),
+            egui::Sense::click_and_drag(),
+        );
+        let painter = ui.painter();
+
+        if response.clicked() || response.dragged() {
+            if let Some(mouse_pos) = response.interact_pointer_pos() {
+                let new_ratio = ((mouse_pos.x - rect.min.x) / rect.width()).clamp(0.0, 1.0);
+                *value = min_f + (new_ratio as f64) * (max_f - min_f);
+                changed = true;
+            }
+        }
+
+        // Inactive background track
+        painter.rect_filled(rect, Rounding::same(track_height / 2.0), COLOR_CONTAINER_HIGHEST);
+
+        // Active filled progress track
+        let active_width = rect.width() * ratio;
+        if active_width > 4.0 {
+            let active_rect = Rect::from_min_size(rect.min, Vec2::new(active_width, track_height));
+            painter.rect_filled(active_rect, Rounding::same(track_height / 2.0), accent);
+        }
+
+        // Handle thumb
+        let thumb_x = rect.min.x + active_width;
+        let thumb_rect = Rect::from_center_size(
+            Pos2::new(thumb_x, rect.center().y),
+            Vec2::new(6.0, track_height + 6.0),
+        );
+        painter.rect_filled(thumb_rect, Rounding::same(3.0), Color32::WHITE);
+    });
+
+    changed
+}
+
+fn m3_slider_i64(
+    ui: &mut egui::Ui,
+    value: &mut i64,
+    range: std::ops::RangeInclusive<i64>,
+    suffix: &str,
+    label: &str,
+    accent: Color32,
+) -> bool {
+    let mut f = *value as f64;
+    let changed = m3_slider_f64(ui, &mut f, (*range.start() as f64)..=(*range.end() as f64), suffix, label, accent);
+    if changed {
+        *value = f.round() as i64;
+    }
+    changed
+}
+
+fn m3_slider_f32(
+    ui: &mut egui::Ui,
+    value: &mut f32,
+    range: std::ops::RangeInclusive<f32>,
+    suffix: &str,
+    label: &str,
+    accent: Color32,
+) -> bool {
+    let mut f = *value as f64;
+    let changed = m3_slider_f64(ui, &mut f, (*range.start() as f64)..=(*range.end() as f64), suffix, label, accent);
+    if changed {
+        *value = f as f32;
+    }
+    changed
+}
+
+fn m3_slider_u32(
+    ui: &mut egui::Ui,
+    value: &mut u32,
+    range: std::ops::RangeInclusive<u32>,
+    suffix: &str,
+    label: &str,
+    accent: Color32,
+) -> bool {
+    let mut f = *value as f64;
+    let changed = m3_slider_f64(ui, &mut f, (*range.start() as f64)..=(*range.end() as f64), suffix, label, accent);
+    if changed {
+        *value = f.round() as u32;
+    }
+    changed
+}
+
+fn m3_slider_u8(
+    ui: &mut egui::Ui,
+    value: &mut u8,
+    range: std::ops::RangeInclusive<u8>,
+    suffix: &str,
+    label: &str,
+    accent: Color32,
+) -> bool {
+    let mut f = *value as f64;
+    let changed = m3_slider_f64(ui, &mut f, (*range.start() as f64)..=(*range.end() as f64), suffix, label, accent);
+    if changed {
+        *value = f.round() as u8;
+    }
+    changed
+}
+
+/// Material 3 Progress Bar with rounded stadium caps
+fn m3_progress_bar(ui: &mut egui::Ui, ratio: f32, height: f32, fill_color: Color32) {
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), height), egui::Sense::hover());
+    let painter = ui.painter();
+
+    // Inactive track
+    painter.rect_filled(rect, Rounding::same(height / 2.0), COLOR_CONTAINER_HIGHEST);
+
+    // Active track
+    let active_w = (rect.width() * ratio.clamp(0.0, 1.0)).max(height);
+    let active_rect = Rect::from_min_size(rect.min, Vec2::new(active_w, height));
+    painter.rect_filled(active_rect, Rounding::same(height / 2.0), fill_color);
+}
+
+// ==============================================================================
+// Telemetry State & Dynamic HW Readers
 // ==============================================================================
 #[derive(Clone, Default)]
 struct SystemTelemetry {
@@ -234,28 +437,28 @@ fn read_cpu_temp_c() -> u32 {
 fn configure_system_fonts(ctx: &egui::Context) {
     let mut fonts = egui::FontDefinitions::default();
     let candidates = [
+        "/run/current-system/sw/share/X11/fonts/GoogleSansCodeNerdFontPropo-Regular.ttf",
         "/run/current-system/sw/share/X11/fonts/NotoSansNerdFont-Regular.ttf",
         "/run/current-system/sw/share/X11/fonts/UbuntuSansNerdFont-Regular.ttf",
-        "/run/current-system/sw/share/X11/fonts/UbuntuMonoNerdFont-Regular.ttf",
         "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
     ];
 
     for path in candidates {
         if let Ok(font_bytes) = fs::read(path) {
             fonts.font_data.insert(
-                "system_nerd_font".to_owned(),
+                "google_sans".to_owned(),
                 egui::FontData::from_owned(font_bytes),
             );
             fonts
                 .families
                 .entry(egui::FontFamily::Proportional)
                 .or_default()
-                .insert(0, "system_nerd_font".to_owned());
+                .insert(0, "google_sans".to_owned());
             fonts
                 .families
                 .entry(egui::FontFamily::Monospace)
                 .or_default()
-                .insert(0, "system_nerd_font".to_owned());
+                .insert(0, "google_sans".to_owned());
             break;
         }
     }
@@ -285,7 +488,7 @@ pub struct LegionSpaceApp {
     slider_fan_rpm: u32,
 
     // Lighting colors & zone targets
-    rgb_zone_target: u8, // 0 = all, 1=z1, 2=z2, 3=z3, 4=z4
+    rgb_zone_target: u8,
     rgb_color: [u8; 3],
     rgb_brightness: u8,
     #[allow(dead_code)]
@@ -294,12 +497,10 @@ pub struct LegionSpaceApp {
 
 impl LegionSpaceApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // Load system fonts for crisp symbols and Nerd Font glyphs
         configure_system_fonts(&cc.egui_ctx);
 
         let (tx, rx) = channel();
 
-        // Spawn background polling thread
         thread::spawn(move || {
             let mut prev_sample = read_cpu_sample();
             let mut cpu_pct = 0.0f32;
@@ -355,7 +556,6 @@ impl LegionSpaceApp {
             }
         });
 
-        // Initial snapshot
         let dmi = probe::probe_dmi();
         let thermal = thermal::get_thermal_status().ok();
         let fans = fan::get_fan_status().ok();
@@ -402,184 +602,170 @@ impl LegionSpaceApp {
 
 impl eframe::App for LegionSpaceApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Drain newest state from background worker
         while let Ok(new_state) = self.rx.try_recv() {
             self.state = new_state;
         }
 
-        // Configure Material 3 Dark Scheme Visuals
+        // Configure Material 3 Dark Scheme Theme Visuals
         let mut visuals = egui::Visuals::dark();
         visuals.override_text_color = Some(COLOR_TEXT_HEADLINE);
-        visuals.panel_fill = COLOR_BG;
+        visuals.panel_fill = COLOR_SURFACE_DIM;
         visuals.window_fill = COLOR_SURFACE;
-        visuals.faint_bg_color = COLOR_SURFACE;
-        visuals.extreme_bg_color = COLOR_BG;
+        visuals.faint_bg_color = COLOR_CONTAINER_LOW;
+        visuals.extreme_bg_color = COLOR_SURFACE_DIM;
 
-        visuals.widgets.noninteractive.bg_fill = COLOR_SURFACE;
-        visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE);
+        // Zero harsh borders; purely tonal elevation
+        visuals.widgets.noninteractive.bg_fill = COLOR_CONTAINER;
+        visuals.widgets.noninteractive.bg_stroke = Stroke::NONE;
         visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0_f32, COLOR_TEXT_HEADLINE);
-        visuals.widgets.noninteractive.rounding = Rounding::same(18.0);
+        visuals.widgets.noninteractive.rounding = Rounding::same(20.0);
 
         visuals.widgets.inactive.bg_fill = COLOR_CONTAINER;
         visuals.widgets.inactive.bg_stroke = Stroke::NONE;
         visuals.widgets.inactive.fg_stroke = Stroke::new(1.0_f32, COLOR_TEXT_HEADLINE);
-        visuals.widgets.inactive.rounding = Rounding::same(18.0);
+        visuals.widgets.inactive.rounding = Rounding::same(20.0);
 
         visuals.widgets.hovered.bg_fill = COLOR_CONTAINER_HIGH;
-        visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, COLOR_BORDER_FOCUS);
+        visuals.widgets.hovered.bg_stroke = Stroke::NONE;
         visuals.widgets.hovered.fg_stroke = Stroke::new(1.0_f32, Color32::WHITE);
-        visuals.widgets.hovered.rounding = Rounding::same(18.0);
+        visuals.widgets.hovered.rounding = Rounding::same(20.0);
 
         visuals.widgets.active.bg_fill = COLOR_PRIMARY;
         visuals.widgets.active.bg_stroke = Stroke::NONE;
         visuals.widgets.active.fg_stroke = Stroke::new(1.0_f32, COLOR_ON_PRIMARY);
-        visuals.widgets.active.rounding = Rounding::same(18.0);
-
-        visuals.selection.bg_fill = COLOR_PRIMARY;
-        visuals.selection.stroke = Stroke::new(1.0_f32, COLOR_ON_PRIMARY);
+        visuals.widgets.active.rounding = Rounding::same(20.0);
 
         ctx.set_visuals(visuals);
 
-        // Top App Bar
-        egui::TopBottomPanel::top("top_panel")
+        // ==============================================================================
+        // Material 3 Navigation Rail (Vertical Left Drawer)
+        // Authentic to Google M3 Tablet/Desktop Architecture & Legion Space
+        // ==============================================================================
+        egui::SidePanel::left("m3_nav_rail")
+            .exact_width(230.0)
             .frame(
                 Frame::none()
-                    .fill(COLOR_SURFACE)
-                    .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
-                    .inner_margin(Margin::symmetric(24.0, 14.0)),
+                    .fill(COLOR_CONTAINER_LOW)
+                    .inner_margin(Margin::symmetric(16.0, 20.0)),
             )
             .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    // Legion Star Emblem & Header Info
-                    draw_legion_badge(ui, 34.0);
-                    ui.add_space(8.0);
-
-                    ui.vertical(|ui| {
-                        ui.horizontal(|ui| {
-                            let model = &self.state.dmi.product_version;
+                ui.vertical(|ui| {
+                    // Legion Branding Header
+                    ui.horizontal(|ui| {
+                        draw_legion_badge(ui, 38.0);
+                        ui.add_space(8.0);
+                        ui.vertical(|ui| {
                             ui.label(
-                                RichText::new(model)
-                                    .size(15.0)
+                                RichText::new("Legion Space")
+                                    .size(17.0)
                                     .strong()
                                     .color(COLOR_TEXT_HEADLINE),
                             );
                             ui.label(
-                                RichText::new(" v1.5.0 ")
-                                    .size(11.0)
-                                    .strong()
-                                    .color(COLOR_PRIMARY)
-                                    .background_color(COLOR_CONTAINER_HIGH),
+                                RichText::new("Material 3 Expressive")
+                                    .size(10.0)
+                                    .color(COLOR_PRIMARY),
                             );
                         });
-                        let bios = &self.state.dmi.bios_version;
-                        ui.label(
-                            RichText::new(format!("BIOS: {} · Native Linux Driver Active", bios))
-                                .size(11.0)
-                                .color(COLOR_TEXT_MUTED),
-                        );
                     });
 
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        // Live Sync Indicator
-                        ui.horizontal(|ui| {
-                            status_dot(ui, COLOR_SUCCESS, 4.0);
-                            ui.label(
-                                RichText::new("Live Telemetry")
-                                    .size(12.0)
-                                    .color(COLOR_TEXT_BODY),
-                            );
-                        });
+                    ui.add_space(24.0);
 
-                        ui.add_space(12.0);
+                    // Navigation Rail Items (M3 Stadium Shape Chips)
+                    let nav_items = [
+                        (AppTab::Dashboard, "󰕮", "Dashboard"),
+                        (AppTab::CustomMode, "󱐋", "Power & GPU"),
+                        (AppTab::Cooling, "󰈐", "Cooling Fans"),
+                        (AppTab::Battery, "󰁹", "Battery & Care"),
+                        (AppTab::Lighting, "󰌌", "Keyboard RGB"),
+                    ];
 
-                        // Battery Pill
-                        if let Some(b) = &self.state.battery {
-                            let batt_str = format!("{}% ({})", b.capacity_percent, b.status);
-                            let batt_color = if b.status == "Charging" {
-                                COLOR_SUCCESS
-                            } else {
-                                COLOR_PRIMARY
-                            };
-                            ui.horizontal(|ui| {
-                                status_dot(ui, batt_color, 4.0);
-                                ui.label(
-                                    RichText::new(batt_str)
-                                        .size(12.0)
-                                        .color(COLOR_TEXT_HEADLINE),
-                                );
-                            });
+                    for (tab, icon, title) in nav_items {
+                        let is_active = self.current_tab == tab;
+                        let item_rect = ui.allocate_exact_size(Vec2::new(198.0, 46.0), egui::Sense::click());
+                        let painter = ui.painter();
+
+                        if item_rect.1.clicked() {
+                            self.current_tab = tab;
                         }
 
-                        ui.add_space(12.0);
+                        let bg_color = if is_active {
+                            COLOR_PRIMARY_CONTAINER
+                        } else if item_rect.1.hovered() {
+                            COLOR_CONTAINER_HIGH
+                        } else {
+                            Color32::TRANSPARENT
+                        };
 
-                        // Thermal Mode Indicator
+                        painter.rect_filled(item_rect.0, Rounding::same(9999.0), bg_color);
+
+                        // Icon and label
+                        let text_color = if is_active {
+                            COLOR_ON_PRIMARY_CONTAINER
+                        } else {
+                            COLOR_TEXT_BODY
+                        };
+
+                        let content_pos = item_rect.0.min + Vec2::new(18.0, 12.0);
+                        painter.text(
+                            content_pos,
+                            egui::Align2::LEFT_TOP,
+                            format!("{}  {}", icon, title),
+                            egui::FontId::proportional(14.0),
+                            text_color,
+                        );
+                    }
+
+                    // Bottom info card in rail
+                    ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+                        ui.add_space(10.0);
+
+                        // Thermal mode pill badge
                         if let Some(t) = &self.state.thermal {
-                            let color = match t.active_mode.as_str() {
+                            let mode_col = match t.active_mode.as_str() {
                                 "quiet" => COLOR_QUIET,
                                 "performance" => COLOR_PERF,
                                 "custom" => COLOR_CUSTOM,
                                 _ => COLOR_BALANCED,
                             };
-                            ui.horizontal(|ui| {
-                                status_dot(ui, color, 4.0);
-                                ui.label(
-                                    RichText::new(&t.power_led_color)
-                                        .size(12.0)
-                                        .color(COLOR_TEXT_HEADLINE),
-                                );
+                            let pill_frame = Frame::none()
+                                .fill(COLOR_CONTAINER)
+                                .rounding(Rounding::same(9999.0))
+                                .inner_margin(Margin::symmetric(14.0, 8.0));
+                            pill_frame.show(ui, |ui| {
+                                ui.horizontal(|ui| {
+                                    status_dot(ui, mode_col, 4.0);
+                                    ui.label(RichText::new(&t.power_led_color).size(12.0).strong().color(COLOR_TEXT_HEADLINE));
+                                });
                             });
                         }
+
+                        ui.add_space(6.0);
+
+                        // Device ID Pill
+                        let dmi_frame = Frame::none()
+                            .fill(COLOR_CONTAINER)
+                            .rounding(Rounding::same(12.0))
+                            .inner_margin(Margin::symmetric(14.0, 8.0));
+                        dmi_frame.show(ui, |ui| {
+                            ui.vertical(|ui| {
+                                ui.label(RichText::new(&self.state.dmi.product_version).size(11.0).strong().color(COLOR_TEXT_HEADLINE));
+                                ui.label(RichText::new(format!("BIOS: {} · Linux Native", self.state.dmi.bios_version)).size(10.0).color(COLOR_TEXT_MUTED));
+                            });
+                        });
                     });
                 });
             });
 
-        // Navigation Bar Tabs (Material 3 Expressive Chips)
-        egui::TopBottomPanel::top("tabs_panel")
+        // ==============================================================================
+        // Main Content View Area
+        // ==============================================================================
+        egui::CentralPanel::default()
             .frame(
                 Frame::none()
-                    .fill(COLOR_BG)
-                    .inner_margin(Margin::symmetric(24.0, 12.0)),
+                    .fill(COLOR_SURFACE_DIM)
+                    .inner_margin(Margin::symmetric(28.0, 24.0)),
             )
-            .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    let tabs = [
-                        (AppTab::Dashboard, "Dashboard"),
-                        (AppTab::CustomMode, "Custom Power & GPU"),
-                        (AppTab::Cooling, "Cooling Fans"),
-                        (AppTab::Battery, "Battery & Privacy"),
-                        (AppTab::Lighting, "4-Zone RGB"),
-                    ];
-
-                    for (tab, label) in tabs {
-                        let is_active = self.current_tab == tab;
-                        let text = RichText::new(label)
-                            .size(13.0)
-                            .strong()
-                            .color(if is_active {
-                                COLOR_ON_PRIMARY
-                            } else {
-                                COLOR_TEXT_HEADLINE
-                            });
-
-                        let btn = egui::Button::new(text)
-                            .fill(if is_active {
-                                COLOR_PRIMARY
-                            } else {
-                                COLOR_CONTAINER
-                            })
-                            .rounding(Rounding::same(9999.0))
-                            .min_size(Vec2::new(140.0, 36.0));
-
-                        if ui.add(btn).clicked() {
-                            self.current_tab = tab;
-                        }
-                    }
-                });
-            });
-
-        // Central Content View Area
-        egui::CentralPanel::default()
-            .frame(Frame::none().fill(COLOR_BG).inner_margin(Margin::same(24.0)))
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| match self.current_tab {
                     AppTab::Dashboard => self.view_dashboard(ui),
@@ -597,7 +783,6 @@ impl eframe::App for LegionSpaceApp {
                     .frame(
                         Frame::none()
                             .fill(COLOR_CONTAINER_HIGH)
-                            .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
                             .inner_margin(Margin::symmetric(24.0, 10.0)),
                     )
                     .show(ctx, |ui| {
@@ -614,54 +799,83 @@ impl eframe::App for LegionSpaceApp {
             }
         }
 
-        // Live repaint trigger
         ctx.request_repaint_after(Duration::from_millis(500));
     }
 }
 
 // ==============================================================================
-// Subview Implementations
+// Subview Implementations (Expressive Material 3 Cards & Components)
 // ==============================================================================
 impl LegionSpaceApp {
     fn view_dashboard(&mut self, ui: &mut egui::Ui) {
-        // Welcome Hero Banner (Material 3 Surface Container)
+        // Welcome Hero Card (M3 Asymmetric Soft Container)
         Frame::none()
             .fill(COLOR_CONTAINER)
-            .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
-            .rounding(Rounding::same(24.0))
-            .inner_margin(Margin::same(24.0))
+            .rounding(Rounding::same(28.0))
+            .inner_margin(Margin::same(26.0))
             .show(ui, |ui| {
                 ui.vertical(|ui| {
                     ui.label(
                         RichText::new("LENOVO LEGION HARDWARE CONTROL SUITE")
                             .size(11.0)
-                            .color(COLOR_PRIMARY)
-                            .strong(),
+                            .strong()
+                            .color(COLOR_PRIMARY),
                     );
                     ui.add_space(4.0);
                     ui.label(
                         RichText::new("Welcome to Legion Space")
-                            .size(24.0)
+                            .size(26.0)
                             .strong()
                             .color(COLOR_TEXT_HEADLINE),
                     );
-                    ui.add_space(2.0);
+                    ui.add_space(4.0);
                     ui.label(
-                        RichText::new(
-                            "Material 3 native systems manager for AMD Ryzen & NVIDIA RTX hardware",
-                        )
-                        .size(13.0)
-                        .color(COLOR_TEXT_BODY),
+                        RichText::new("AMD Ryzen 7 7745HX · NVIDIA RTX 5060 Laptop · 32GB DDR5 · Linux Kernel Driver")
+                            .size(13.0)
+                            .color(COLOR_TEXT_BODY),
                     );
+
+                    ui.add_space(14.0);
+
+                    // Quick glanceable badges
+                    ui.horizontal(|ui| {
+                        let badges = [
+                            (format!("󰻠 {} °C CPU", self.state.telemetry.cpu_temp_c), COLOR_PRIMARY),
+                            (format!("󰢮 {} °C GPU", self.state.gpu.as_ref().map(|g| g.current_temp_c).unwrap_or(0)), COLOR_TEAL),
+                            (
+                                format!(
+                                    "󰈐 {} RPM Fans",
+                                    self.state.fans.as_ref().and_then(|f| f.fans.first()).map(|f| f.current_rpm).unwrap_or(0)
+                                ),
+                                COLOR_SECONDARY,
+                            ),
+                            (
+                                format!(
+                                    "󰁹 {}% Battery",
+                                    self.state.battery.as_ref().map(|b| b.capacity_percent).unwrap_or(0)
+                                ),
+                                COLOR_SUCCESS,
+                            ),
+                        ];
+
+                        for (text, col) in badges {
+                            Frame::none()
+                                .fill(COLOR_CONTAINER_HIGH)
+                                .rounding(Rounding::same(9999.0))
+                                .inner_margin(Margin::symmetric(14.0, 6.0))
+                                .show(ui, |ui| {
+                                    ui.label(RichText::new(text).size(12.0).strong().color(col));
+                                });
+                        }
+                    });
                 });
             });
 
-        ui.add_space(18.0);
+        ui.add_space(20.0);
 
-        // Thermal Profile Selector Section
+        // Thermal Profile Selector (Material 3 Segmented Mode Tiles)
         Frame::none()
-            .fill(COLOR_SURFACE)
-            .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
+            .fill(COLOR_CONTAINER_LOW)
             .rounding(Rounding::same(24.0))
             .inner_margin(Margin::same(20.0))
             .show(ui, |ui| {
@@ -672,11 +886,9 @@ impl LegionSpaceApp {
                         .color(COLOR_TEXT_HEADLINE),
                 );
                 ui.label(
-                    RichText::new(
-                        "Direct ACPI platform profile switching with physical power button LED sync",
-                    )
-                    .size(12.0)
-                    .color(COLOR_TEXT_BODY),
+                    RichText::new("Physical power button LED indicator sync via ACPI platform profile")
+                        .size(12.0)
+                        .color(COLOR_TEXT_MUTED),
                 );
 
                 ui.add_space(14.0);
@@ -692,26 +904,16 @@ impl LegionSpaceApp {
 
                 ui.columns(4, |cols| {
                     let profiles = [
-                        ("quiet", "Quiet", "Silent Fans · Power Saving", COLOR_QUIET),
-                        (
-                            "balanced",
-                            "Balanced",
-                            "Adaptive Auto Dynamics",
-                            COLOR_BALANCED,
-                        ),
-                        (
-                            "performance",
-                            "Performance",
-                            "High Clocks · Accelerated",
-                            COLOR_PERF,
-                        ),
-                        ("custom", "Custom", "Manual Power Envelopes", COLOR_CUSTOM),
+                        ("quiet", "Quiet", "Silent Fans", COLOR_QUIET),
+                        ("balanced", "Balanced", "Auto Dynamics", COLOR_BALANCED),
+                        ("performance", "Performance", "Turbo Clocks", COLOR_PERF),
+                        ("custom", "Custom", "Manual Tuning", COLOR_CUSTOM),
                     ];
 
                     for (idx, (id, title, desc, col)) in profiles.iter().enumerate() {
                         let is_active = current_mode == *id;
 
-                        let btn_frame = Frame::none()
+                        let tile_frame = Frame::none()
                             .fill(if is_active {
                                 COLOR_PRIMARY_CONTAINER
                             } else {
@@ -720,17 +922,14 @@ impl LegionSpaceApp {
                             .stroke(if is_active {
                                 Stroke::new(1.5_f32, COLOR_PRIMARY)
                             } else {
-                                Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE)
+                                Stroke::NONE
                             })
-                            .rounding(Rounding::same(18.0))
-                            .inner_margin(Margin::symmetric(14.0, 12.0));
+                            .rounding(Rounding::same(20.0))
+                            .inner_margin(Margin::symmetric(14.0, 14.0));
 
-                        btn_frame.show(&mut cols[idx], |ui| {
-                            let sense = ui.interact(
-                                ui.max_rect(),
-                                ui.make_persistent_id(format!("prof_{}", id)),
-                                egui::Sense::click(),
-                            );
+                        tile_frame.show(&mut cols[idx], |ui| {
+                            let rect = ui.max_rect();
+                            let sense = ui.interact(rect, ui.make_persistent_id(format!("m3_prof_{}", id)), egui::Sense::click());
                             if sense.clicked() {
                                 switch_to_profile = Some(*id);
                             }
@@ -749,12 +948,8 @@ impl LegionSpaceApp {
                                             }),
                                     );
                                 });
-                                ui.add_space(2.0);
-                                ui.label(
-                                    RichText::new(*desc)
-                                        .size(11.0)
-                                        .color(COLOR_TEXT_MUTED),
-                                );
+                                ui.add_space(4.0);
+                                ui.label(RichText::new(*desc).size(11.0).color(COLOR_TEXT_MUTED));
                             });
                         });
                     }
@@ -767,358 +962,216 @@ impl LegionSpaceApp {
                 }
             });
 
-        ui.add_space(18.0);
+        ui.add_space(20.0);
 
-        // Hardware Telemetry Gauges (CPU, RAM, GPU)
+        // Telemetry Gauges (CPU, RAM, GPU)
         ui.columns(3, |cols| {
-            // CPU Telemetry Card
+            // CPU Card
             Frame::none()
-                .fill(COLOR_SURFACE)
-                .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
-                .rounding(Rounding::same(20.0))
+                .fill(COLOR_CONTAINER)
+                .rounding(Rounding::same(24.0))
                 .inner_margin(Margin::same(20.0))
                 .show(&mut cols[0], |ui| {
                     ui.horizontal(|ui| {
-                        ui.label(
-                            RichText::new("CPU")
-                                .size(15.0)
-                                .strong()
-                                .color(COLOR_PRIMARY),
-                        );
+                        ui.label(RichText::new("CPU").size(15.0).strong().color(COLOR_PRIMARY));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             let val_str = format!("{:.0}%", self.state.telemetry.cpu_usage_pct);
-                            ui.label(
-                                RichText::new(val_str)
-                                    .size(22.0)
-                                    .strong()
-                                    .color(COLOR_TEXT_HEADLINE),
-                            );
+                            ui.label(RichText::new(val_str).size(26.0).strong().color(COLOR_TEXT_HEADLINE));
                         });
                     });
 
-                    ui.add_space(6.0);
-                    let cpu_ratio = (self.state.telemetry.cpu_usage_pct / 100.0).clamp(0.0, 1.0);
-                    ui.add(
-                        ProgressBar::new(cpu_ratio)
-                            .desired_height(6.0)
-                            .rounding(Rounding::same(4.0))
-                            .fill(COLOR_PRIMARY),
-                    );
+                    ui.add_space(8.0);
+                    let ratio = (self.state.telemetry.cpu_usage_pct / 100.0).clamp(0.0, 1.0);
+                    m3_progress_bar(ui, ratio, 8.0, COLOR_PRIMARY);
 
-                    ui.add_space(12.0);
+                    ui.add_space(14.0);
                     ui.horizontal(|ui| {
                         ui.label(RichText::new("Frequency").size(12.0).color(COLOR_TEXT_MUTED));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            ui.label(
-                                RichText::new(format!(
-                                    "{:.2} GHz",
-                                    self.state.telemetry.cpu_freq_ghz
-                                ))
-                                .size(12.0)
-                                .strong()
-                                .color(COLOR_TEXT_BODY),
-                            );
+                            ui.label(RichText::new(format!("{:.2} GHz", self.state.telemetry.cpu_freq_ghz)).size(12.0).strong().color(COLOR_TEXT_BODY));
                         });
                     });
                     ui.horizontal(|ui| {
                         ui.label(RichText::new("Temperature").size(12.0).color(COLOR_TEXT_MUTED));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            let temp = self.state.telemetry.cpu_temp_c;
-                            let temp_col = if temp > 85 {
-                                COLOR_PERF
-                            } else if temp > 70 {
-                                COLOR_WARNING
-                            } else {
-                                COLOR_SUCCESS
-                            };
-                            ui.label(
-                                RichText::new(format!("{} °C", temp))
-                                    .size(12.0)
-                                    .strong()
-                                    .color(temp_col),
-                            );
+                            let t = self.state.telemetry.cpu_temp_c;
+                            let col = if t > 85 { COLOR_PERF } else if t > 70 { COLOR_WARNING } else { COLOR_SUCCESS };
+                            ui.label(RichText::new(format!("{} °C", t)).size(12.0).strong().color(col));
                         });
                     });
                     ui.horizontal(|ui| {
                         ui.label(RichText::new("Fan 1 (CPU)").size(12.0).color(COLOR_TEXT_MUTED));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            let fan1_rpm = self
-                                .state
-                                .fans
-                                .as_ref()
-                                .and_then(|f| f.fans.first())
-                                .map(|f| f.current_rpm)
-                                .unwrap_or(0);
-                            ui.label(
-                                RichText::new(format!("{} RPM", fan1_rpm))
-                                    .size(12.0)
-                                    .strong()
-                                    .color(COLOR_TEXT_BODY),
-                            );
+                            let rpm = self.state.fans.as_ref().and_then(|f| f.fans.first()).map(|f| f.current_rpm).unwrap_or(0);
+                            ui.label(RichText::new(format!("{} RPM", rpm)).size(12.0).strong().color(COLOR_TEXT_BODY));
                         });
                     });
                 });
 
-            // RAM Telemetry Card
+            // RAM Card
             Frame::none()
-                .fill(COLOR_SURFACE)
-                .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
-                .rounding(Rounding::same(20.0))
+                .fill(COLOR_CONTAINER)
+                .rounding(Rounding::same(24.0))
                 .inner_margin(Margin::same(20.0))
                 .show(&mut cols[1], |ui| {
                     ui.horizontal(|ui| {
-                        ui.label(
-                            RichText::new("RAM")
-                                .size(15.0)
-                                .strong()
-                                .color(COLOR_SECONDARY),
-                        );
+                        ui.label(RichText::new("RAM").size(15.0).strong().color(COLOR_SECONDARY));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             let val_str = format!("{:.0}%", self.state.telemetry.ram_usage_pct);
-                            ui.label(
-                                RichText::new(val_str)
-                                    .size(22.0)
-                                    .strong()
-                                    .color(COLOR_TEXT_HEADLINE),
-                            );
+                            ui.label(RichText::new(val_str).size(26.0).strong().color(COLOR_TEXT_HEADLINE));
                         });
                     });
 
-                    ui.add_space(6.0);
-                    let ram_ratio = (self.state.telemetry.ram_usage_pct / 100.0).clamp(0.0, 1.0);
-                    ui.add(
-                        ProgressBar::new(ram_ratio)
-                            .desired_height(6.0)
-                            .rounding(Rounding::same(4.0))
-                            .fill(COLOR_SECONDARY),
-                    );
+                    ui.add_space(8.0);
+                    let ratio = (self.state.telemetry.ram_usage_pct / 100.0).clamp(0.0, 1.0);
+                    m3_progress_bar(ui, ratio, 8.0, COLOR_SECONDARY);
 
-                    ui.add_space(12.0);
+                    ui.add_space(14.0);
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("Memory Used").size(12.0).color(COLOR_TEXT_MUTED));
+                        ui.label(RichText::new("In Use").size(12.0).color(COLOR_TEXT_MUTED));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            ui.label(
-                                RichText::new(format!(
-                                    "{:.1} GB",
-                                    self.state.telemetry.ram_used_gb
-                                ))
-                                .size(12.0)
-                                .strong()
-                                .color(COLOR_TEXT_BODY),
-                            );
+                            ui.label(RichText::new(format!("{:.1} GB", self.state.telemetry.ram_used_gb)).size(12.0).strong().color(COLOR_TEXT_BODY));
                         });
                     });
                     ui.horizontal(|ui| {
                         ui.label(RichText::new("Total RAM").size(12.0).color(COLOR_TEXT_MUTED));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            ui.label(
-                                RichText::new(format!(
-                                    "{:.1} GB",
-                                    self.state.telemetry.ram_total_gb
-                                ))
-                                .size(12.0)
-                                .strong()
-                                .color(COLOR_TEXT_BODY),
-                            );
+                            ui.label(RichText::new(format!("{:.1} GB", self.state.telemetry.ram_total_gb)).size(12.0).strong().color(COLOR_TEXT_BODY));
                         });
                     });
                     ui.horizontal(|ui| {
                         ui.label(RichText::new("Memory Type").size(12.0).color(COLOR_TEXT_MUTED));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            ui.label(
-                                RichText::new("DDR5 Dual-Channel")
-                                    .size(12.0)
-                                    .strong()
-                                    .color(COLOR_TEXT_BODY),
-                            );
+                            ui.label(RichText::new("DDR5 Dual-Ch").size(12.0).strong().color(COLOR_TEXT_BODY));
                         });
                     });
                 });
 
-            // GPU Telemetry Card
+            // GPU Card
             Frame::none()
-                .fill(COLOR_SURFACE)
-                .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
-                .rounding(Rounding::same(20.0))
+                .fill(COLOR_CONTAINER)
+                .rounding(Rounding::same(24.0))
                 .inner_margin(Margin::same(20.0))
                 .show(&mut cols[2], |ui| {
                     ui.horizontal(|ui| {
-                        ui.label(
-                            RichText::new("GPU")
-                                .size(15.0)
-                                .strong()
-                                .color(COLOR_TEAL),
-                        );
+                        ui.label(RichText::new("GPU").size(15.0).strong().color(COLOR_TEAL));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             let temp = self.state.gpu.as_ref().map(|g| g.current_temp_c).unwrap_or(0);
-                            let temp_col = if temp > 80 {
-                                COLOR_PERF
-                            } else if temp > 65 {
-                                COLOR_WARNING
-                            } else {
-                                COLOR_SUCCESS
-                            };
-                            ui.label(
-                                RichText::new(format!("{} °C", temp))
-                                    .size(22.0)
-                                    .strong()
-                                    .color(temp_col),
-                            );
+                            let col = if temp > 80 { COLOR_PERF } else if temp > 65 { COLOR_WARNING } else { COLOR_SUCCESS };
+                            ui.label(RichText::new(format!("{} °C", temp)).size(26.0).strong().color(col));
                         });
                     });
 
-                    ui.add_space(6.0);
-                    let gpu_power = self.state.gpu.as_ref().map(|g| g.power_draw_w).unwrap_or(0.0);
-                    let gpu_ratio = (gpu_power / 100.0).clamp(0.0, 1.0);
-                    ui.add(
-                        ProgressBar::new(gpu_ratio)
-                            .desired_height(6.0)
-                            .rounding(Rounding::same(4.0))
-                            .fill(COLOR_TEAL),
-                    );
+                    ui.add_space(8.0);
+                    let power = self.state.gpu.as_ref().map(|g| g.power_draw_w).unwrap_or(0.0);
+                    let ratio = (power / 100.0).clamp(0.0, 1.0) as f32;
+                    m3_progress_bar(ui, ratio, 8.0, COLOR_TEAL);
 
-                    ui.add_space(12.0);
+                    ui.add_space(14.0);
                     if let Some(g) = &self.state.gpu {
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new("Graphics Clock").size(12.0).color(COLOR_TEXT_MUTED));
+                            ui.label(RichText::new("Clocks").size(12.0).color(COLOR_TEXT_MUTED));
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                ui.label(
-                                    RichText::new(format!("{} MHz", g.graphics_clock_mhz))
-                                        .size(12.0)
-                                        .strong()
-                                        .color(COLOR_TEXT_BODY),
-                                );
+                                ui.label(RichText::new(format!("{} MHz", g.graphics_clock_mhz)).size(12.0).strong().color(COLOR_TEXT_BODY));
                             });
                         });
                         ui.horizontal(|ui| {
                             ui.label(RichText::new("Power Draw").size(12.0).color(COLOR_TEXT_MUTED));
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                ui.label(
-                                    RichText::new(format!("{:.1} W", g.power_draw_w))
-                                        .size(12.0)
-                                        .strong()
-                                        .color(COLOR_TEXT_BODY),
-                                );
+                                ui.label(RichText::new(format!("{:.1} W", g.power_draw_w)).size(12.0).strong().color(COLOR_TEXT_BODY));
                             });
                         });
                         ui.horizontal(|ui| {
                             ui.label(RichText::new("Fan 2 (GPU)").size(12.0).color(COLOR_TEXT_MUTED));
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                let fan2_rpm = self
-                                    .state
-                                    .fans
-                                    .as_ref()
-                                    .and_then(|f| f.fans.get(1))
-                                    .map(|f| f.current_rpm)
-                                    .unwrap_or(0);
-                                ui.label(
-                                    RichText::new(format!("{} RPM", fan2_rpm))
-                                        .size(12.0)
-                                        .strong()
-                                        .color(COLOR_TEXT_BODY),
-                                );
+                                let rpm = self.state.fans.as_ref().and_then(|f| f.fans.get(1)).map(|f| f.current_rpm).unwrap_or(0);
+                                ui.label(RichText::new(format!("{} RPM", rpm)).size(12.0).strong().color(COLOR_TEXT_BODY));
                             });
                         });
                     }
                 });
         });
 
-        ui.add_space(18.0);
+        ui.add_space(20.0);
 
-        // Quick Access Controls Section
+        // Material 3 Expressive Quick Hardware Controls
         Frame::none()
-            .fill(COLOR_SURFACE)
-            .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
+            .fill(COLOR_CONTAINER_LOW)
             .rounding(Rounding::same(24.0))
             .inner_margin(Margin::same(20.0))
             .show(ui, |ui| {
-                ui.label(
-                    RichText::new("Quick Hardware Controls")
-                        .size(17.0)
-                        .strong()
-                        .color(COLOR_TEXT_HEADLINE),
-                );
-                ui.label(
-                    RichText::new("Instant switches for battery chemistry, USB ports, and privacy")
-                        .size(12.0)
-                        .color(COLOR_TEXT_BODY),
-                );
+                ui.label(RichText::new("Quick Hardware Switches").size(17.0).strong().color(COLOR_TEXT_HEADLINE));
+                ui.label(RichText::new("Instant toggle switches for battery conservation, USB ports, and privacy").size(12.0).color(COLOR_TEXT_MUTED));
 
-                ui.add_space(14.0);
+                ui.add_space(16.0);
 
                 ui.columns(3, |cols| {
-                    // Quick Control 1: Conservation Mode
+                    // Control 1: Battery Conservation
                     Frame::none()
                         .fill(COLOR_CONTAINER)
-                        .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
-                        .rounding(Rounding::same(18.0))
-                        .inner_margin(Margin::same(16.0))
+                        .rounding(Rounding::same(20.0))
+                        .inner_margin(Margin::same(18.0))
                         .show(&mut cols[0], |ui| {
-                            ui.label(RichText::new("Battery Conservation").strong().color(COLOR_TEXT_HEADLINE));
-                            ui.label(RichText::new("Cap charge at 80% for longevity").size(11.0).color(COLOR_TEXT_MUTED));
-                            ui.add_space(10.0);
-
-                            let mut cons = self.state.battery.as_ref().map(|b| b.conservation_mode).unwrap_or(false);
-                            let cons_label = if cons { "Enabled (80% Cap)" } else { "Disabled (100%)" };
-                            if ui.checkbox(&mut cons, cons_label).changed() {
-                                if battery::set_conservation_mode(cons).is_ok() {
-                                    self.notify(format!("Battery Conservation: {}", if cons { "Enabled" } else { "Disabled" }));
-                                }
-                            }
-                        });
-
-                    // Quick Control 2: Always-On USB
-                    Frame::none()
-                        .fill(COLOR_CONTAINER)
-                        .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
-                        .rounding(Rounding::same(18.0))
-                        .inner_margin(Margin::same(16.0))
-                        .show(&mut cols[1], |ui| {
-                            ui.label(RichText::new("Always-On USB").strong().color(COLOR_TEXT_HEADLINE));
-                            ui.label(RichText::new("Charge devices while sleeping").size(11.0).color(COLOR_TEXT_MUTED));
-                            ui.add_space(10.0);
-
-                            let mut usb = self.state.battery.as_ref().and_then(|b| b.usb_charging).unwrap_or(false);
-                            let usb_label = if usb { "Enabled (Charging)" } else { "Disabled (Off)" };
-                            if ui.checkbox(&mut usb, usb_label).changed() {
-                                if battery::set_usb_charging(usb).is_ok() {
-                                    self.notify(format!("Always-On USB: {}", if usb { "Enabled" } else { "Disabled" }));
-                                }
-                            }
-                        });
-
-                    // Quick Control 3: Camera E-Shutter Privacy Switch
-                    Frame::none()
-                        .fill(COLOR_CONTAINER)
-                        .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
-                        .rounding(Rounding::same(18.0))
-                        .inner_margin(Margin::same(16.0))
-                        .show(&mut cols[2], |ui| {
-                            ui.label(RichText::new("Camera E-Shutter").strong().color(COLOR_TEXT_HEADLINE));
-                            ui.label(RichText::new("Hardware privacy shutter switch").size(11.0).color(COLOR_TEXT_MUTED));
-                            ui.add_space(10.0);
-
-                            let cam_active = self.state.platform.camera_power.unwrap_or(false);
                             ui.horizontal(|ui| {
-                                status_dot(ui, if cam_active { COLOR_SUCCESS } else { COLOR_WARNING }, 4.0);
-                                ui.label(
-                                    RichText::new(if cam_active {
-                                        "Camera Active"
-                                    } else {
-                                        "Privacy Blocked"
-                                    })
-                                    .size(12.0)
-                                    .strong()
-                                    .color(COLOR_TEXT_HEADLINE),
-                                );
+                                ui.vertical(|ui| {
+                                    ui.label(RichText::new("Conservation").size(14.0).strong().color(COLOR_TEXT_HEADLINE));
+                                    ui.label(RichText::new("80% Charge Cap").size(11.0).color(COLOR_TEXT_MUTED));
+                                });
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    let mut cons = self.state.battery.as_ref().map(|b| b.conservation_mode).unwrap_or(false);
+                                    if m3_switch(ui, &mut cons) {
+                                        if battery::set_conservation_mode(cons).is_ok() {
+                                            self.notify(format!("Conservation: {}", if cons { "Enabled (80%)" } else { "Disabled" }));
+                                        }
+                                    }
+                                });
                             });
-                            ui.add_space(6.0);
-                            let toggle_text = if cam_active { "Kill Camera" } else { "Enable Camera" };
-                            if ui.button(RichText::new(toggle_text).size(11.0)).clicked() {
-                                if platform::set_camera_power(!cam_active).is_ok() {
-                                    self.notify(format!("Camera privacy set to {}", if !cam_active { "Enabled" } else { "Disabled" }));
-                                }
-                            }
+                        });
+
+                    // Control 2: Always-On USB
+                    Frame::none()
+                        .fill(COLOR_CONTAINER)
+                        .rounding(Rounding::same(20.0))
+                        .inner_margin(Margin::same(18.0))
+                        .show(&mut cols[1], |ui| {
+                            ui.horizontal(|ui| {
+                                ui.vertical(|ui| {
+                                    ui.label(RichText::new("Always-On USB").size(14.0).strong().color(COLOR_TEXT_HEADLINE));
+                                    ui.label(RichText::new("Charge in Sleep").size(11.0).color(COLOR_TEXT_MUTED));
+                                });
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    let mut usb = self.state.battery.as_ref().and_then(|b| b.usb_charging).unwrap_or(false);
+                                    if m3_switch(ui, &mut usb) {
+                                        if battery::set_usb_charging(usb).is_ok() {
+                                            self.notify(format!("Always-On USB: {}", if usb { "Enabled" } else { "Disabled" }));
+                                        }
+                                    }
+                                });
+                            });
+                        });
+
+                    // Control 3: Camera Hardware E-Shutter
+                    Frame::none()
+                        .fill(COLOR_CONTAINER)
+                        .rounding(Rounding::same(20.0))
+                        .inner_margin(Margin::same(18.0))
+                        .show(&mut cols[2], |ui| {
+                            ui.horizontal(|ui| {
+                                ui.vertical(|ui| {
+                                    ui.label(RichText::new("Camera Privacy").size(14.0).strong().color(COLOR_TEXT_HEADLINE));
+                                    let cam_on = self.state.platform.camera_power.unwrap_or(false);
+                                    let status_str = if cam_on { "Active (Open)" } else { "Shutter Killed" };
+                                    ui.label(RichText::new(status_str).size(11.0).color(if cam_on { COLOR_SUCCESS } else { COLOR_WARNING }));
+                                });
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    let mut cam_state = self.state.platform.camera_power.unwrap_or(false);
+                                    if m3_switch(ui, &mut cam_state) {
+                                        if platform::set_camera_power(cam_state).is_ok() {
+                                            self.notify(format!("Camera power: {}", if cam_state { "Enabled" } else { "Killed" }));
+                                        }
+                                    }
+                                });
+                            });
                         });
                 });
             });
@@ -1126,124 +1179,76 @@ impl LegionSpaceApp {
 
     fn view_custom_mode(&mut self, ui: &mut egui::Ui) {
         Frame::none()
-            .fill(COLOR_SURFACE)
-            .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
-            .rounding(Rounding::same(24.0))
+            .fill(COLOR_CONTAINER_LOW)
+            .rounding(Rounding::same(28.0))
             .inner_margin(Margin::same(24.0))
             .show(ui, |ui| {
                 ui.label(
-                    RichText::new("Custom Mode Hardware Envelopes & Power Tuning")
-                        .size(19.0)
+                    RichText::new("Custom Mode Hardware Envelopes")
+                        .size(20.0)
                         .strong()
                         .color(COLOR_TEXT_HEADLINE),
                 );
                 ui.label(
-                    RichText::new("Fine-tune CPU sustained/boost package limits and NVIDIA RTX TGP power limits")
+                    RichText::new("Material 3 Expressive sliders for CPU sustained/peak power and NVIDIA RTX 5060 TGP tuning")
                         .size(12.0)
-                        .color(COLOR_TEXT_BODY),
+                        .color(COLOR_TEXT_MUTED),
                 );
 
                 ui.add_space(20.0);
 
                 ui.columns(2, |cols| {
-                    // CPU Power Limits Column
+                    // CPU Limits Column
                     Frame::none()
                         .fill(COLOR_CONTAINER)
-                        .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
-                        .rounding(Rounding::same(18.0))
+                        .rounding(Rounding::same(22.0))
                         .inner_margin(Margin::same(20.0))
                         .show(&mut cols[0], |ui| {
-                            ui.label(
-                                RichText::new("CPU Power & Thermal Limits (AMD Ryzen)")
-                                    .size(15.0)
-                                    .strong()
-                                    .color(COLOR_PRIMARY),
-                            );
+                            ui.label(RichText::new("AMD Ryzen CPU Package Limits").size(15.0).strong().color(COLOR_PRIMARY));
                             ui.add_space(14.0);
 
-                            ui.label(
-                                RichText::new(format!("PL1 (Sustained Power Limit): {} W", self.slider_pl1))
-                                    .color(COLOR_TEXT_HEADLINE),
-                            );
-                            ui.add(egui::Slider::new(&mut self.slider_pl1, 50..=85).suffix(" W"));
-
-                            ui.add_space(10.0);
-                            ui.label(
-                                RichText::new(format!("PL2 (Slow Package Tracking): {} W", self.slider_pl2))
-                                    .color(COLOR_TEXT_HEADLINE),
-                            );
-                            ui.add(egui::Slider::new(&mut self.slider_pl2, 60..=130).suffix(" W"));
-
-                            ui.add_space(10.0);
-                            ui.label(
-                                RichText::new(format!("PL3 (Fast Peak Power): {} W", self.slider_pl3))
-                                    .color(COLOR_TEXT_HEADLINE),
-                            );
-                            ui.add(egui::Slider::new(&mut self.slider_pl3, 70..=150).suffix(" W"));
-
-                            ui.add_space(10.0);
-                            ui.label(
-                                RichText::new(format!("CPU Thermal Throttle Ceiling: {} °C", self.slider_cpu_temp))
-                                    .color(COLOR_TEXT_HEADLINE),
-                            );
-                            ui.add(egui::Slider::new(&mut self.slider_cpu_temp, 85..=100).suffix(" °C"));
+                            m3_slider_i64(ui, &mut self.slider_pl1, 50..=85, "W", "PL1 Sustained Power Limit", COLOR_PRIMARY);
+                            ui.add_space(12.0);
+                            m3_slider_i64(ui, &mut self.slider_pl2, 60..=130, "W", "PL2 Slow Package Tracking", COLOR_PRIMARY);
+                            ui.add_space(12.0);
+                            m3_slider_i64(ui, &mut self.slider_pl3, 70..=150, "W", "PL3 Fast Peak Power", COLOR_PRIMARY);
+                            ui.add_space(12.0);
+                            m3_slider_i64(ui, &mut self.slider_cpu_temp, 85..=100, "°C", "CPU Thermal Throttle Ceiling", COLOR_PRIMARY);
                         });
 
-                    // GPU Power Limits Column
+                    // GPU Limits Column
                     Frame::none()
                         .fill(COLOR_CONTAINER)
-                        .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
-                        .rounding(Rounding::same(18.0))
+                        .rounding(Rounding::same(22.0))
                         .inner_margin(Margin::same(20.0))
                         .show(&mut cols[1], |ui| {
-                            ui.label(
-                                RichText::new("NVIDIA RTX 5060 Power & Thermals")
-                                    .size(15.0)
-                                    .strong()
-                                    .color(COLOR_TEAL),
-                            );
+                            ui.label(RichText::new("NVIDIA RTX 5060 Laptop Thermals").size(15.0).strong().color(COLOR_TEAL));
                             ui.add_space(14.0);
 
-                            ui.label(
-                                RichText::new(format!("GPU Target TGP Limit: {:.0} W", self.slider_gpu_pl))
-                                    .color(COLOR_TEXT_HEADLINE),
-                            );
-                            ui.add(egui::Slider::new(&mut self.slider_gpu_pl, 5.0..=115.0).suffix(" W"));
+                            m3_slider_f32(ui, &mut self.slider_gpu_pl, 5.0..=115.0, "W", "GPU Target TGP Limit", COLOR_TEAL);
+                            ui.add_space(12.0);
+                            m3_slider_i64(ui, &mut self.slider_ac_offset, 10..=85, "W", "GPU AC Baseline Offset", COLOR_TEAL);
+                            ui.add_space(12.0);
+                            m3_slider_i64(ui, &mut self.slider_gpu_temp, 75..=87, "°C", "GPU Thermal Throttle Ceiling", COLOR_TEAL);
+                            ui.add_space(16.0);
 
-                            ui.add_space(10.0);
-                            ui.label(
-                                RichText::new(format!("GPU AC Processing Baseline Offset: {} W", self.slider_ac_offset))
-                                    .color(COLOR_TEXT_HEADLINE),
-                            );
-                            ui.add(egui::Slider::new(&mut self.slider_ac_offset, 10..=85).suffix(" W"));
-
-                            ui.add_space(10.0);
-                            ui.label(
-                                RichText::new(format!("GPU Thermal Throttle Ceiling: {} °C", self.slider_gpu_temp))
-                                    .color(COLOR_TEXT_HEADLINE),
-                            );
-                            ui.add(egui::Slider::new(&mut self.slider_gpu_temp, 75..=87).suffix(" °C"));
-
-                            ui.add_space(14.0);
-                            ui.label(
-                                RichText::new("cTGP: 80 W (Fixed) · Dynamic Boost (PPAB): 15 W")
-                                    .size(11.0)
-                                    .color(COLOR_TEXT_MUTED),
-                            );
+                            Frame::none()
+                                .fill(COLOR_CONTAINER_HIGH)
+                                .rounding(Rounding::same(12.0))
+                                .inner_margin(Margin::symmetric(14.0, 8.0))
+                                .show(ui, |ui| {
+                                    ui.label(RichText::new("cTGP: 80 W (Fixed) · Dynamic Boost (PPAB): 15 W").size(11.0).color(COLOR_TEXT_MUTED));
+                                });
                         });
                 });
 
                 ui.add_space(20.0);
 
                 ui.horizontal(|ui| {
-                    let apply_btn = egui::Button::new(
-                        RichText::new("Apply Custom Settings")
-                            .strong()
-                            .color(COLOR_ON_PRIMARY),
-                    )
-                    .fill(COLOR_PRIMARY)
-                    .rounding(Rounding::same(9999.0))
-                    .min_size(Vec2::new(190.0, 38.0));
+                    let apply_btn = egui::Button::new(RichText::new("Apply Custom Envelopes").strong().color(COLOR_ON_PRIMARY))
+                        .fill(COLOR_PRIMARY)
+                        .rounding(Rounding::same(9999.0))
+                        .min_size(Vec2::new(190.0, 40.0));
 
                     if ui.add(apply_btn).clicked() {
                         let _ = gpu::set_gpu_tuning_settings(
@@ -1261,13 +1266,10 @@ impl LegionSpaceApp {
                         self.notify("Custom mode power limits and GPU settings updated!");
                     }
 
-                    let reset_btn = egui::Button::new(
-                        RichText::new("Reset to Balanced Defaults")
-                            .color(COLOR_TEXT_HEADLINE),
-                    )
-                    .fill(COLOR_CONTAINER_HIGH)
-                    .rounding(Rounding::same(9999.0))
-                    .min_size(Vec2::new(170.0, 38.0));
+                    let reset_btn = egui::Button::new(RichText::new("Reset to Balanced Defaults").color(COLOR_TEXT_HEADLINE))
+                        .fill(COLOR_CONTAINER_HIGH)
+                        .rounding(Rounding::same(9999.0))
+                        .min_size(Vec2::new(180.0, 40.0));
 
                     if ui.add(reset_btn).clicked() {
                         self.slider_pl1 = 70;
@@ -1285,57 +1287,41 @@ impl LegionSpaceApp {
 
     fn view_cooling(&mut self, ui: &mut egui::Ui) {
         Frame::none()
-            .fill(COLOR_SURFACE)
-            .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
-            .rounding(Rounding::same(24.0))
+            .fill(COLOR_CONTAINER_LOW)
+            .rounding(Rounding::same(28.0))
             .inner_margin(Margin::same(24.0))
             .show(ui, |ui| {
-                ui.label(
-                    RichText::new("Cooling Fans & Thermal Curves")
-                        .size(19.0)
-                        .strong()
-                        .color(COLOR_TEXT_HEADLINE),
-                );
-                ui.label(
-                    RichText::new("Independent dual blower telemetry, firmware curves, and target RPM management")
-                        .size(12.0)
-                        .color(COLOR_TEXT_BODY),
-                );
+                ui.label(RichText::new("Cooling Fans & Thermal Curves").size(20.0).strong().color(COLOR_TEXT_HEADLINE));
+                ui.label(RichText::new("Dual independent blower monitoring and manual target RPM management").size(12.0).color(COLOR_TEXT_MUTED));
 
-                ui.add_space(18.0);
+                ui.add_space(20.0);
 
-                // Quick Preset Pills
+                // Quick Mode Chips
                 ui.horizontal(|ui| {
-                    let auto_btn = egui::Button::new(
-                        RichText::new("Auto Curve").strong().color(COLOR_TEXT_HEADLINE),
-                    )
-                    .fill(COLOR_CONTAINER)
-                    .rounding(Rounding::same(9999.0))
-                    .min_size(Vec2::new(130.0, 36.0));
+                    let auto_btn = egui::Button::new(RichText::new("Auto Curve").strong().color(COLOR_TEXT_HEADLINE))
+                        .fill(COLOR_CONTAINER)
+                        .rounding(Rounding::same(9999.0))
+                        .min_size(Vec2::new(130.0, 36.0));
                     if ui.add(auto_btn).clicked() {
                         if fan::set_auto().is_ok() {
                             self.notify("Restored automatic firmware fan curve");
                         }
                     }
 
-                    let full_btn = egui::Button::new(
-                        RichText::new("Full Turbo (5100 RPM)").strong().color(COLOR_PERF),
-                    )
-                    .fill(COLOR_CONTAINER)
-                    .rounding(Rounding::same(9999.0))
-                    .min_size(Vec2::new(170.0, 36.0));
+                    let full_btn = egui::Button::new(RichText::new("Full Turbo (5100 RPM)").strong().color(COLOR_PERF))
+                        .fill(COLOR_CONTAINER)
+                        .rounding(Rounding::same(9999.0))
+                        .min_size(Vec2::new(180.0, 36.0));
                     if ui.add(full_btn).clicked() {
                         if fan::set_full_speed().is_ok() {
                             self.notify("Fans set to maximum turbo speed (5100 RPM)");
                         }
                     }
 
-                    let quiet_btn = egui::Button::new(
-                        RichText::new("Silent Baseline (1700 RPM)").strong().color(COLOR_QUIET),
-                    )
-                    .fill(COLOR_CONTAINER)
-                    .rounding(Rounding::same(9999.0))
-                    .min_size(Vec2::new(180.0, 36.0));
+                    let quiet_btn = egui::Button::new(RichText::new("Silent Baseline (1700 RPM)").strong().color(COLOR_QUIET))
+                        .fill(COLOR_CONTAINER)
+                        .rounding(Rounding::same(9999.0))
+                        .min_size(Vec2::new(180.0, 36.0));
                     if ui.add(quiet_btn).clicked() {
                         let _ = fan::set_fan_target(1, 1700);
                         let _ = fan::set_fan_target(2, 1700);
@@ -1343,22 +1329,14 @@ impl LegionSpaceApp {
                     }
                 });
 
-                ui.add_space(20.0);
+                ui.add_space(22.0);
 
-                // Manual RPM Target Slider
-                ui.label(
-                    RichText::new(format!("Manual Target Speed: {} RPM", self.slider_fan_rpm))
-                        .size(14.0)
-                        .strong()
-                        .color(COLOR_TEXT_HEADLINE),
-                );
-                let slider = egui::Slider::new(&mut self.slider_fan_rpm, 1700..=5100).suffix(" RPM");
-                if ui.add(slider).changed() {
-                    let _ = fan::set_fan_target(1, self.slider_fan_rpm);
-                    let _ = fan::set_fan_target(2, self.slider_fan_rpm);
-                }
+                // Manual RPM Slider
+                m3_slider_u32(ui, &mut self.slider_fan_rpm, 1700..=5100, "RPM", "Manual Target Speed", COLOR_PRIMARY);
+                let _ = fan::set_fan_target(1, self.slider_fan_rpm);
+                let _ = fan::set_fan_target(2, self.slider_fan_rpm);
 
-                ui.add_space(20.0);
+                ui.add_space(24.0);
 
                 // Dual Blower Live Telemetry Cards
                 ui.columns(2, |cols| {
@@ -1368,35 +1346,33 @@ impl LegionSpaceApp {
                     // Fan 1 (CPU)
                     Frame::none()
                         .fill(COLOR_CONTAINER)
-                        .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
-                        .rounding(Rounding::same(18.0))
+                        .rounding(Rounding::same(22.0))
                         .inner_margin(Margin::same(20.0))
                         .show(&mut cols[0], |ui| {
                             ui.label(RichText::new("Fan 1 (CPU Cooler)").size(15.0).strong().color(COLOR_PRIMARY));
                             ui.add_space(6.0);
-                            ui.label(RichText::new(format!("{} RPM", fan1_rpm)).size(24.0).strong().color(COLOR_TEXT_HEADLINE));
-                            ui.add_space(4.0);
+                            ui.label(RichText::new(format!("{} RPM", fan1_rpm)).size(26.0).strong().color(COLOR_TEXT_HEADLINE));
+                            ui.add_space(6.0);
                             let ratio = ((fan1_rpm as f32 - 1700.0) / (5100.0 - 1700.0)).clamp(0.0, 1.0);
-                            ui.add(ProgressBar::new(ratio).desired_height(6.0).rounding(Rounding::same(4.0)).fill(COLOR_PRIMARY));
+                            m3_progress_bar(ui, ratio, 8.0, COLOR_PRIMARY);
                             ui.add_space(10.0);
-                            ui.label(RichText::new("Operating Range: 1700 - 5100 RPM").size(11.0).color(COLOR_TEXT_MUTED));
+                            ui.label(RichText::new("Rated Operating Bounds: 1700 - 5100 RPM").size(11.0).color(COLOR_TEXT_MUTED));
                         });
 
                     // Fan 2 (GPU)
                     Frame::none()
                         .fill(COLOR_CONTAINER)
-                        .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
-                        .rounding(Rounding::same(18.0))
+                        .rounding(Rounding::same(22.0))
                         .inner_margin(Margin::same(20.0))
                         .show(&mut cols[1], |ui| {
                             ui.label(RichText::new("Fan 2 (GPU Cooler)").size(15.0).strong().color(COLOR_TEAL));
                             ui.add_space(6.0);
-                            ui.label(RichText::new(format!("{} RPM", fan2_rpm)).size(24.0).strong().color(COLOR_TEXT_HEADLINE));
-                            ui.add_space(4.0);
+                            ui.label(RichText::new(format!("{} RPM", fan2_rpm)).size(26.0).strong().color(COLOR_TEXT_HEADLINE));
+                            ui.add_space(6.0);
                             let ratio = ((fan2_rpm as f32 - 1700.0) / (5100.0 - 1700.0)).clamp(0.0, 1.0);
-                            ui.add(ProgressBar::new(ratio).desired_height(6.0).rounding(Rounding::same(4.0)).fill(COLOR_TEAL));
+                            m3_progress_bar(ui, ratio, 8.0, COLOR_TEAL);
                             ui.add_space(10.0);
-                            ui.label(RichText::new("Operating Range: 1700 - 5100 RPM").size(11.0).color(COLOR_TEXT_MUTED));
+                            ui.label(RichText::new("Rated Operating Bounds: 1700 - 5100 RPM").size(11.0).color(COLOR_TEXT_MUTED));
                         });
                 });
             });
@@ -1404,50 +1380,38 @@ impl LegionSpaceApp {
 
     fn view_battery(&mut self, ui: &mut egui::Ui) {
         Frame::none()
-            .fill(COLOR_SURFACE)
-            .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
-            .rounding(Rounding::same(24.0))
+            .fill(COLOR_CONTAINER_LOW)
+            .rounding(Rounding::same(28.0))
             .inner_margin(Margin::same(24.0))
             .show(ui, |ui| {
-                ui.label(
-                    RichText::new("Battery Care & Hardware Privacy")
-                        .size(19.0)
-                        .strong()
-                        .color(COLOR_TEXT_HEADLINE),
-                );
-                ui.label(
-                    RichText::new("Conservation threshold limiter, power telemetry, and physical e-shutter detection")
-                        .size(12.0)
-                        .color(COLOR_TEXT_BODY),
-                );
+                ui.label(RichText::new("Battery Care & Hardware Privacy").size(20.0).strong().color(COLOR_TEXT_HEADLINE));
+                ui.label(RichText::new("Conservation threshold limiter, power delivery metrics, and physical e-shutter").size(12.0).color(COLOR_TEXT_MUTED));
 
                 ui.add_space(20.0);
 
-                let battery_info = self.state.battery.clone();
-                if let Some(b) = battery_info {
+                if let Some(b) = self.state.battery.clone() {
                     ui.columns(2, |cols| {
                         // Column 1: Battery Telemetry & Capacity
                         Frame::none()
                             .fill(COLOR_CONTAINER)
-                            .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
-                            .rounding(Rounding::same(18.0))
+                            .rounding(Rounding::same(22.0))
                             .inner_margin(Margin::same(20.0))
                             .show(&mut cols[0], |ui| {
-                                ui.label(RichText::new("Battery Health & Delivery").size(15.0).strong().color(COLOR_PRIMARY));
+                                ui.label(RichText::new("Battery Health & Power Delivery").size(15.0).strong().color(COLOR_PRIMARY));
                                 ui.add_space(8.0);
                                 ui.label(
                                     RichText::new(format!("{}% ({})", b.capacity_percent, b.status))
-                                        .size(24.0)
+                                        .size(26.0)
                                         .strong()
                                         .color(COLOR_TEXT_HEADLINE),
                                 );
-                                ui.add_space(4.0);
+                                ui.add_space(6.0);
                                 let cap_ratio = (b.capacity_percent as f32 / 100.0).clamp(0.0, 1.0);
-                                ui.add(ProgressBar::new(cap_ratio).desired_height(6.0).rounding(Rounding::same(4.0)).fill(COLOR_PRIMARY));
+                                m3_progress_bar(ui, cap_ratio, 8.0, COLOR_PRIMARY);
 
                                 ui.add_space(14.0);
                                 if let Some(h) = b.health_percent {
-                                    ui.label(RichText::new(format!("Health Rating: {:.1}%", h)).size(13.0).strong().color(COLOR_TEXT_BODY));
+                                    ui.label(RichText::new(format!("Battery Health Rating: {:.1}%", h)).size(13.0).strong().color(COLOR_TEXT_BODY));
                                     ui.label(RichText::new(format!("Capacity: {:.1} Wh / {:.1} Wh (Design)", b.energy_full_wh, b.energy_design_wh)).size(11.0).color(COLOR_TEXT_MUTED));
                                 }
                                 ui.add_space(6.0);
@@ -1458,57 +1422,65 @@ impl LegionSpaceApp {
                         // Column 2: Switches and Privacy Controls
                         Frame::none()
                             .fill(COLOR_CONTAINER)
-                            .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
-                            .rounding(Rounding::same(18.0))
+                            .rounding(Rounding::same(22.0))
                             .inner_margin(Margin::same(20.0))
                             .show(&mut cols[1], |ui| {
                                 ui.label(RichText::new("Hardware Control Switches").size(15.0).strong().color(COLOR_SECONDARY));
-                                ui.add_space(12.0);
-
-                                let mut conservation = b.conservation_mode;
-                                if ui.checkbox(&mut conservation, "Battery Conservation (Cap at 80%)").changed() {
-                                    if battery::set_conservation_mode(conservation).is_ok() {
-                                        self.notify(format!("Conservation mode: {}", if conservation { "Enabled" } else { "Disabled" }));
-                                    }
-                                }
-                                ui.label(RichText::new("Prolongs battery life when connected to AC").size(11.0).color(COLOR_TEXT_MUTED));
-
                                 ui.add_space(14.0);
 
-                                let mut usb = b.usb_charging.unwrap_or(false);
-                                if ui.checkbox(&mut usb, "Always-On USB Charging").changed() {
-                                    if battery::set_usb_charging(usb).is_ok() {
-                                        self.notify(format!("Always-On USB: {}", if usb { "Enabled" } else { "Disabled" }));
-                                    }
-                                }
-                                ui.label(RichText::new("Allows charging mobile devices while laptop sleeps").size(11.0).color(COLOR_TEXT_MUTED));
+                                // Conservation Switch
+                                ui.horizontal(|ui| {
+                                    ui.vertical(|ui| {
+                                        ui.label(RichText::new("Battery Conservation (80%)").strong().color(COLOR_TEXT_HEADLINE));
+                                        ui.label(RichText::new("Prolongs battery life when on AC").size(11.0).color(COLOR_TEXT_MUTED));
+                                    });
+                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                        let mut cons = b.conservation_mode;
+                                        if m3_switch(ui, &mut cons) {
+                                            if battery::set_conservation_mode(cons).is_ok() {
+                                                self.notify(format!("Conservation: {}", if cons { "Enabled (80%)" } else { "Disabled" }));
+                                            }
+                                        }
+                                    });
+                                });
 
                                 ui.add_space(16.0);
 
-                                // Camera Hardware E-Shutter Section
-                                let cam_active = self.state.platform.camera_power.unwrap_or(false);
+                                // Always-On USB Switch
                                 ui.horizontal(|ui| {
-                                    status_dot(ui, if cam_active { COLOR_SUCCESS } else { COLOR_WARNING }, 4.0);
-                                    ui.label(
-                                        RichText::new(if cam_active {
-                                            "Camera E-Shutter: Enabled (Open)"
-                                        } else {
-                                            "Camera E-Shutter: Hardware Privacy Active"
-                                        })
-                                        .size(13.0)
-                                        .strong()
-                                        .color(COLOR_TEXT_HEADLINE),
-                                    );
+                                    ui.vertical(|ui| {
+                                        ui.label(RichText::new("Always-On USB Charging").strong().color(COLOR_TEXT_HEADLINE));
+                                        ui.label(RichText::new("Charge peripherals while suspended").size(11.0).color(COLOR_TEXT_MUTED));
+                                    });
+                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                        let mut usb = b.usb_charging.unwrap_or(false);
+                                        if m3_switch(ui, &mut usb) {
+                                            if battery::set_usb_charging(usb).is_ok() {
+                                                self.notify(format!("Always-On USB: {}", if usb { "Enabled" } else { "Disabled" }));
+                                            }
+                                        }
+                                    });
                                 });
-                                ui.add_space(4.0);
-                                ui.label(RichText::new("Physical slider switch on right chassis cuts power to webcam").size(11.0).color(COLOR_TEXT_MUTED));
-                                ui.add_space(8.0);
-                                let toggle_text = if cam_active { "Kill Camera (Disable)" } else { "Re-enable Camera" };
-                                if ui.button(RichText::new(toggle_text).strong()).clicked() {
-                                    if platform::set_camera_power(!cam_active).is_ok() {
-                                        self.notify(format!("Camera privacy set to {}", if !cam_active { "Enabled" } else { "Disabled" }));
-                                    }
-                                }
+
+                                ui.add_space(16.0);
+
+                                // Camera Hardware Switch
+                                ui.horizontal(|ui| {
+                                    ui.vertical(|ui| {
+                                        ui.label(RichText::new("Camera Hardware E-Shutter").strong().color(COLOR_TEXT_HEADLINE));
+                                        let cam_on = self.state.platform.camera_power.unwrap_or(false);
+                                        let status_str = if cam_on { "Active (Open)" } else { "Hardware Shutter Killed" };
+                                        ui.label(RichText::new(status_str).size(11.0).color(if cam_on { COLOR_SUCCESS } else { COLOR_WARNING }));
+                                    });
+                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                        let mut cam = self.state.platform.camera_power.unwrap_or(false);
+                                        if m3_switch(ui, &mut cam) {
+                                            if platform::set_camera_power(cam).is_ok() {
+                                                self.notify(format!("Camera power: {}", if cam { "Enabled" } else { "Killed" }));
+                                            }
+                                        }
+                                    });
+                                });
                             });
                     });
                 }
@@ -1517,22 +1489,12 @@ impl LegionSpaceApp {
 
     fn view_lighting(&mut self, ui: &mut egui::Ui) {
         Frame::none()
-            .fill(COLOR_SURFACE)
-            .stroke(Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE))
-            .rounding(Rounding::same(24.0))
+            .fill(COLOR_CONTAINER_LOW)
+            .rounding(Rounding::same(28.0))
             .inner_margin(Margin::same(24.0))
             .show(ui, |ui| {
-                ui.label(
-                    RichText::new("4-Zone RGB Keyboard Lighting")
-                        .size(19.0)
-                        .strong()
-                        .color(COLOR_TEXT_HEADLINE),
-                );
-                ui.label(
-                    RichText::new("Direct ITE 8258 USB HID (048d:c195) 0xCC report protocol controller")
-                        .size(12.0)
-                        .color(COLOR_TEXT_BODY),
-                );
+                ui.label(RichText::new("4-Zone RGB Keyboard Lighting").size(20.0).strong().color(COLOR_TEXT_HEADLINE));
+                ui.label(RichText::new("Direct ITE 8258 USB HID (048d:c195) 0xCC report protocol controller").size(12.0).color(COLOR_TEXT_MUTED));
 
                 ui.add_space(20.0);
 
@@ -1562,7 +1524,7 @@ impl LegionSpaceApp {
                 ui.add_space(22.0);
 
                 // Visual Keyboard 4-Zone Representation
-                ui.label(RichText::new("Zone Configuration").size(14.0).strong().color(COLOR_TEXT_HEADLINE));
+                ui.label(RichText::new("Zone Layout").size(14.0).strong().color(COLOR_TEXT_HEADLINE));
                 ui.add_space(8.0);
                 ui.columns(4, |cols| {
                     let zone_labels = [
@@ -1575,8 +1537,8 @@ impl LegionSpaceApp {
                         let is_sel = self.rgb_zone_target == (i as u8 + 1) || self.rgb_zone_target == 0;
                         Frame::none()
                             .fill(if is_sel { COLOR_CONTAINER_HIGH } else { COLOR_CONTAINER })
-                            .stroke(if is_sel { Stroke::new(1.5_f32, COLOR_PRIMARY) } else { Stroke::new(1.0_f32, COLOR_BORDER_SUBTLE) })
-                            .rounding(Rounding::same(14.0))
+                            .stroke(if is_sel { Stroke::new(1.5_f32, COLOR_PRIMARY) } else { Stroke::NONE })
+                            .rounding(Rounding::same(16.0))
                             .inner_margin(Margin::same(14.0))
                             .show(&mut cols[i], |ui| {
                                 ui.label(RichText::new(*zn).size(13.0).strong().color(COLOR_TEXT_HEADLINE));
@@ -1634,11 +1596,8 @@ impl LegionSpaceApp {
                     }
                 });
 
-                ui.add_space(14.0);
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("Brightness:").strong().color(COLOR_TEXT_HEADLINE));
-                    ui.add(egui::Slider::new(&mut self.rgb_brightness, 0..=3).suffix(" / 3"));
-                });
+                ui.add_space(16.0);
+                m3_slider_u8(ui, &mut self.rgb_brightness, 0..=3, "/ 3", "Keyboard Backlight Brightness", COLOR_PRIMARY);
             });
     }
 }
@@ -1650,8 +1609,8 @@ fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("Legion Space")
-            .with_inner_size([1040.0, 780.0])
-            .with_min_inner_size([880.0, 600.0]),
+            .with_inner_size([1120.0, 760.0])
+            .with_min_inner_size([960.0, 640.0]),
         ..Default::default()
     };
 
