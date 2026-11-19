@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Legion Space Linux GUI Launcher (v1.4.0)
+# Legion Space Linux GUI Launcher (v1.5.0)
 # Native Rust Material You desktop application
 # Automatically configures runtime Wayland & OpenGL libraries on NixOS
 # ==============================================================================

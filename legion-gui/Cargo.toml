@@ -1,6 +1,6 @@
 [package]
 name = "legionspace-gui"
-version = "1.4.0"
+version = "1.5.0"
 edition = "2021"
 authors = ["AayamPokhrel <pokhrelaayam1010@gmail.com>"]
 description = "Native Rust Material You desktop application for Lenovo Legion laptops"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# All-In-One Automated Installer for Lenovo Legion Linux Suite (v1.4.0)
+# All-In-One Automated Installer for Lenovo Legion Linux Suite (v1.5.0)
 # Hardware: Lenovo Legion Pro 5 16ADR10 (Product 83LT)
 # ==============================================================================
 set -euo pipefail
@@ -15,7 +15,7 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 echo -e "${CYAN}${BOLD}========================================================================${NC}"
-echo -e "${CYAN}${BOLD}   Lenovo Legion Pro 5 16ADR10 Automated Installer (v1.4.0)            ${NC}"
+echo -e "${CYAN}${BOLD}   Lenovo Legion Pro 5 16ADR10 Automated Installer (v1.5.0)            ${NC}"
 echo -e "${CYAN}${BOLD}========================================================================${NC}"
 
 IS_ROOT=false
@@ -212,7 +212,7 @@ with open(config_path, "r") as f:
 if "hardware.lenovo-legion.enable" not in cfg_content:
     print("      -> Enabling hardware.lenovo-legion in configuration.nix...")
     addition = """
-  # Lenovo Legion Pro 5 16ADR10 Driver & CLI (v1.4.0)
+  # Lenovo Legion Pro 5 16ADR10 Driver & CLI (v1.5.0)
   hardware.lenovo-legion.enable = true;
 """
     target_ak = "hardware.ajazz-ak820-max.daemon.enable = true;\n"
