@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# All-In-One Automated Installer for Lenovo Legion Linux Suite (v1.5.0)
+# All-In-One Automated Installer for Lenovo Legion Linux Suite (v1.6.0)
 # Hardware: Lenovo Legion Pro 5 16ADR10 (Product 83LT)
 # ==============================================================================
 set -euo pipefail
@@ -15,7 +15,7 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 echo -e "${CYAN}${BOLD}========================================================================${NC}"
-echo -e "${CYAN}${BOLD}   Lenovo Legion Pro 5 16ADR10 Automated Installer (v1.5.0)            ${NC}"
+echo -e "${CYAN}${BOLD}   Lenovo Legion Pro 5 16ADR10 Automated Installer (v1.6.0)            ${NC}"
 echo -e "${CYAN}${BOLD}========================================================================${NC}"
 
 IS_ROOT=false
