@@ -18,6 +18,7 @@ use views::power::PowerSliders;
 pub enum AppTab {
     Dashboard,
     CustomMode,
+    Oled,
     Cooling,
     Battery,
     Lighting,
@@ -138,6 +139,7 @@ impl eframe::App for LegionSpaceApp {
                     let nav_items = [
                         (AppTab::Dashboard, "Dashboard", 1),
                         (AppTab::CustomMode, "Power & GPU", 2),
+                        (AppTab::Oled, "Display & OLED", 6),
                         (AppTab::Cooling, "Cooling Fans", 3),
                         (AppTab::Battery, "Battery & Care", 4),
                         (AppTab::Lighting, "Keyboard RGB", 5),
@@ -179,7 +181,8 @@ impl eframe::App for LegionSpaceApp {
                             2 => draw_icon_power(painter, icon_box, fg_color),
                             3 => draw_icon_fan(painter, icon_box, fg_color),
                             4 => draw_icon_battery(painter, icon_box, fg_color, 80.0),
-                            _ => draw_icon_keyboard(painter, icon_box, fg_color),
+                            5 => draw_icon_keyboard(painter, icon_box, fg_color),
+                            _ => draw_icon_display(painter, icon_box, fg_color),
                         }
 
                         // Text label
@@ -261,7 +264,8 @@ impl eframe::App for LegionSpaceApp {
 
                     match self.current_tab {
                         AppTab::Dashboard => views::dashboard::render_dashboard(ui, &self.state, &mut notify_fn),
-                        AppTab::CustomMode => views::power::render_power(ui, &mut self.power_sliders, &mut notify_fn),
+                        AppTab::CustomMode => views::power::render_power(ui, &self.state, &mut self.power_sliders, &mut notify_fn),
+                        AppTab::Oled => views::oled::render_oled(ui, &self.state, &mut notify_fn),
                         AppTab::Cooling => views::cooling::render_cooling(ui, &self.state, &mut self.slider_fan_rpm, &mut notify_fn),
                         AppTab::Battery => views::battery::render_battery(ui, &self.state, &mut notify_fn),
                         AppTab::Lighting => views::lighting::render_lighting(ui, &mut self.lighting_state, &mut notify_fn),

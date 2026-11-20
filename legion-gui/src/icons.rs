@@ -294,3 +294,33 @@ pub fn draw_legion_star(painter: &egui::Painter, center: Pos2, radius: f32, colo
     painter.circle_filled(center, radius * 0.24, Color32::from_black_alpha(200));
     painter.circle_stroke(center, radius * 0.24, Stroke::new(1.4_f32, color));
 }
+
+/// Display Monitor & OLED Care Icon
+pub fn draw_icon_display(painter: &egui::Painter, rect: Rect, color: Color32) {
+    let c = rect.center();
+    let w = rect.width() * 0.78;
+    let h = rect.height() * 0.50;
+
+    // Screen bezel
+    let screen = Rect::from_center_size(c - Vec2::new(0.0, h * 0.16), Vec2::new(w, h));
+    painter.rect_filled(screen, Rounding::same(3.5), color);
+    painter.rect_filled(screen.shrink(2.0), Rounding::same(2.0), Color32::from_black_alpha(170));
+
+    // Stand stem
+    let stem_w = w * 0.16;
+    let stem_h = h * 0.28;
+    let stem = Rect::from_min_size(
+        Pos2::new(c.x - stem_w / 2.0, screen.max.y),
+        Vec2::new(stem_w, stem_h),
+    );
+    painter.rect_filled(stem, Rounding::same(1.0), color);
+
+    // Stand base
+    let base_w = w * 0.44;
+    let base_h = 2.5;
+    let base = Rect::from_center_size(
+        Pos2::new(c.x, screen.max.y + stem_h),
+        Vec2::new(base_w, base_h),
+    );
+    painter.rect_filled(base, Rounding::same(1.2), color);
+}

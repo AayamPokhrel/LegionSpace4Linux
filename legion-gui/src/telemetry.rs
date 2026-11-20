@@ -3,7 +3,9 @@ use legion_cli::hardware::{
     custom_mode::{self, CustomModeConfig},
     fan::{self, FanSystemStatus},
     gpu::{self, GpuTelemetry},
+    gpu_modes::{self, GpuModeStatus},
     lighting::{self, LightingStatus},
+    oled::{self, OledCareSettings},
     platform::{self, PlatformFeatures},
     probe::{self, DmiInfo},
     thermal::{self, ThermalStatus},
@@ -31,6 +33,8 @@ pub struct AppStateSnapshot {
     pub gpu: Option<GpuTelemetry>,
     pub battery: Option<BatteryDetails>,
     pub platform: PlatformFeatures,
+    pub gpu_mode: GpuModeStatus,
+    pub oled: OledCareSettings,
     #[allow(dead_code)]
     pub lighting: Option<LightingStatus>,
     #[allow(dead_code)]
@@ -164,6 +168,8 @@ pub fn start_telemetry_thread() -> (Receiver<AppStateSnapshot>, AppStateSnapshot
         gpu: gpu::get_gpu_telemetry().ok(),
         battery: battery::get_battery_details().ok(),
         platform: platform::get_platform_features(),
+        gpu_mode: gpu_modes::get_gpu_mode_status(),
+        oled: oled::load_oled_settings(),
         lighting: lighting::get_lighting_status().ok(),
         custom: custom_mode::get_custom_mode_config().ok(),
         telemetry: SystemTelemetry {
@@ -205,6 +211,8 @@ pub fn start_telemetry_thread() -> (Receiver<AppStateSnapshot>, AppStateSnapshot
             let gpu = gpu::get_gpu_telemetry().ok();
             let battery = battery::get_battery_details().ok();
             let platform = platform::get_platform_features();
+            let gpu_mode = gpu_modes::get_gpu_mode_status();
+            let oled = oled::load_oled_settings();
             let lighting = lighting::get_lighting_status().ok();
             let custom = custom_mode::get_custom_mode_config().ok();
 
@@ -215,6 +223,8 @@ pub fn start_telemetry_thread() -> (Receiver<AppStateSnapshot>, AppStateSnapshot
                 gpu,
                 battery,
                 platform,
+                gpu_mode,
+                oled,
                 lighting,
                 custom,
                 telemetry: SystemTelemetry {

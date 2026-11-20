@@ -1,5 +1,9 @@
 use eframe::egui::{self, Frame, Margin, RichText, Rounding, Vec2};
-use legion_cli::hardware::{battery, platform, thermal};
+use legion_cli::hardware::{
+    battery,
+    gpu_modes::{self, GpuWorkingMode},
+    platform, thermal,
+};
 
 use crate::icons::*;
 use crate::telemetry::AppStateSnapshot;
@@ -357,7 +361,75 @@ pub fn render_dashboard(
     ui.add_space(20.0);
 
     // ==============================================================================
-    // 4. Quick Hardware Switches (M3 Stadium Cards)
+    // 4. GPU Working Mode Quick Selector (Official Legion Space Layout)
+    // ==============================================================================
+    Frame::none()
+        .fill(SURFACE_CONTAINER_LOW)
+        .rounding(ROUNDING_SQUIRCLE_LG)
+        .inner_margin(Margin::same(20.0))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                let (icon_rect, _) = ui.allocate_exact_size(Vec2::splat(22.0), egui::Sense::hover());
+                draw_icon_gpu(ui.painter(), icon_rect, COLOR_TEAL);
+                ui.add_space(4.0);
+                ui.vertical(|ui| {
+                    ui.label(RichText::new("GPU Working Mode").size(16.0).strong().color(ON_SURFACE));
+                    ui.label(RichText::new("Dynamic Optimus, Hardware MUX direct, or Eco battery power").size(11.0).color(OUTLINE_MUTED));
+                });
+            });
+
+            ui.add_space(14.0);
+
+            let current_gpu_mode = state.gpu_mode.active_mode;
+            let mut switch_gpu = None;
+
+            ui.columns(4, |cols| {
+                let g_modes = [
+                    (GpuWorkingMode::Hybrid, "Hybrid (Optimus)", "Dynamic Switching"),
+                    (GpuWorkingMode::DGpuOnly, "dGPU Mode", "Parade MUX Direct"),
+                    (GpuWorkingMode::IGpuOnly, "Hybrid-iGPU", "Eco Battery Saver"),
+                    (GpuWorkingMode::HybridAuto, "Hybrid-Auto", "AC/DC Dynamic Auto"),
+                ];
+
+                for (idx, (m, title, desc)) in g_modes.iter().enumerate() {
+                    let is_active = current_gpu_mode == *m;
+                    let frame = Frame::none()
+                        .fill(if is_active { PRIMARY_CONTAINER } else { SURFACE_CONTAINER })
+                        .rounding(Rounding::same(16.0))
+                        .inner_margin(Margin::symmetric(14.0, 10.0));
+
+                    frame.show(&mut cols[idx], |ui| {
+                        let rect = ui.max_rect();
+                        let sense = ui.interact(rect, ui.make_persistent_id(format!("m3_dash_gpu_{:?}", m)), egui::Sense::click());
+                        if sense.clicked() {
+                            switch_gpu = Some(*m);
+                        }
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new(*title).size(13.0).strong().color(if is_active { ON_PRIMARY_CONTAINER } else { ON_SURFACE }));
+                            if is_active {
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    let (chk_rect, _) = ui.allocate_exact_size(Vec2::splat(14.0), egui::Sense::hover());
+                                    draw_icon_check(ui.painter(), chk_rect.center(), 10.0, PRIMARY);
+                                });
+                            }
+                        });
+                        ui.add_space(4.0);
+                        ui.label(RichText::new(*desc).size(10.0).color(OUTLINE_MUTED));
+                    });
+                }
+            });
+
+            if let Some(target) = switch_gpu {
+                if let Ok(updated) = gpu_modes::set_gpu_working_mode(target) {
+                    notify(format!("Switched GPU Mode to {}", updated.active_mode));
+                }
+            }
+        });
+
+    ui.add_space(20.0);
+
+    // ==============================================================================
+    // 5. Quick Hardware Switches (M3 Stadium Cards)
     // ==============================================================================
     Frame::none()
         .fill(SURFACE_CONTAINER_LOW)
@@ -365,24 +437,24 @@ pub fn render_dashboard(
         .inner_margin(Margin::same(20.0))
         .show(ui, |ui| {
             ui.label(RichText::new("Quick Hardware Switches").size(17.0).strong().color(ON_SURFACE));
-            ui.label(RichText::new("Instant toggle switches for battery conservation, USB ports, and privacy").size(12.0).color(OUTLINE_MUTED));
+            ui.label(RichText::new("Instant toggle switches for battery conservation, rapid charge, USB ports, Fn-lock, and privacy").size(12.0).color(OUTLINE_MUTED));
 
             ui.add_space(16.0);
 
-            ui.columns(3, |cols| {
+            ui.columns(5, |cols| {
                 // Control 1: Battery Conservation
                 Frame::none()
                     .fill(SURFACE_CONTAINER)
                     .rounding(Rounding::same(20.0))
-                    .inner_margin(Margin::same(18.0))
+                    .inner_margin(Margin::same(14.0))
                     .show(&mut cols[0], |ui| {
                         ui.horizontal(|ui| {
-                            let (icon_rect, _) = ui.allocate_exact_size(Vec2::splat(24.0), egui::Sense::hover());
+                            let (icon_rect, _) = ui.allocate_exact_size(Vec2::splat(22.0), egui::Sense::hover());
                             draw_icon_battery(ui.painter(), icon_rect, PRIMARY, 80.0);
-                            ui.add_space(4.0);
+                            ui.add_space(2.0);
                             ui.vertical(|ui| {
-                                ui.label(RichText::new("Conservation").size(14.0).strong().color(ON_SURFACE));
-                                ui.label(RichText::new("80% Charge Cap").size(11.0).color(OUTLINE_MUTED));
+                                ui.label(RichText::new("Conservation").size(13.0).strong().color(ON_SURFACE));
+                                ui.label(RichText::new("80% Cap").size(10.0).color(OUTLINE_MUTED));
                             });
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                 let mut cons = state.battery.as_ref().map(|b| b.conservation_mode).unwrap_or(false);
@@ -395,19 +467,44 @@ pub fn render_dashboard(
                         });
                     });
 
-                // Control 2: Always-On USB
+                // Control 2: Rapid Charge
                 Frame::none()
                     .fill(SURFACE_CONTAINER)
                     .rounding(Rounding::same(20.0))
-                    .inner_margin(Margin::same(18.0))
+                    .inner_margin(Margin::same(14.0))
                     .show(&mut cols[1], |ui| {
                         ui.horizontal(|ui| {
-                            let (icon_rect, _) = ui.allocate_exact_size(Vec2::splat(24.0), egui::Sense::hover());
-                            draw_icon_power(ui.painter(), icon_rect, SECONDARY);
-                            ui.add_space(4.0);
+                            let (icon_rect, _) = ui.allocate_exact_size(Vec2::splat(22.0), egui::Sense::hover());
+                            draw_icon_power(ui.painter(), icon_rect, COLOR_PERF);
+                            ui.add_space(2.0);
                             ui.vertical(|ui| {
-                                ui.label(RichText::new("Always-On USB").size(14.0).strong().color(ON_SURFACE));
-                                ui.label(RichText::new("Charge in Sleep").size(11.0).color(OUTLINE_MUTED));
+                                ui.label(RichText::new("Rapid Charge").size(13.0).strong().color(ON_SURFACE));
+                                ui.label(RichText::new("Fast 0-70%").size(10.0).color(OUTLINE_MUTED));
+                            });
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                let mut rapid = state.platform.rapid_charge.unwrap_or(false);
+                                if m3_switch(ui, &mut rapid) {
+                                    if platform::set_rapid_charge(rapid).is_ok() {
+                                        notify(format!("Rapid Charge: {}", if rapid { "Enabled" } else { "Disabled" }));
+                                    }
+                                }
+                            });
+                        });
+                    });
+
+                // Control 3: Always-On USB
+                Frame::none()
+                    .fill(SURFACE_CONTAINER)
+                    .rounding(Rounding::same(20.0))
+                    .inner_margin(Margin::same(14.0))
+                    .show(&mut cols[2], |ui| {
+                        ui.horizontal(|ui| {
+                            let (icon_rect, _) = ui.allocate_exact_size(Vec2::splat(22.0), egui::Sense::hover());
+                            draw_icon_power(ui.painter(), icon_rect, SECONDARY);
+                            ui.add_space(2.0);
+                            ui.vertical(|ui| {
+                                ui.label(RichText::new("Sleep USB").size(13.0).strong().color(ON_SURFACE));
+                                ui.label(RichText::new("Charge Port").size(10.0).color(OUTLINE_MUTED));
                             });
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                 let mut usb = state.battery.as_ref().and_then(|b| b.usb_charging).unwrap_or(false);
@@ -420,21 +517,46 @@ pub fn render_dashboard(
                         });
                     });
 
-                // Control 3: Camera Hardware E-Shutter
+                // Control 4: Fn-Lock
                 Frame::none()
                     .fill(SURFACE_CONTAINER)
                     .rounding(Rounding::same(20.0))
-                    .inner_margin(Margin::same(18.0))
-                    .show(&mut cols[2], |ui| {
+                    .inner_margin(Margin::same(14.0))
+                    .show(&mut cols[3], |ui| {
+                        ui.horizontal(|ui| {
+                            let (icon_rect, _) = ui.allocate_exact_size(Vec2::splat(22.0), egui::Sense::hover());
+                            draw_icon_keyboard(ui.painter(), icon_rect, PRIMARY);
+                            ui.add_space(2.0);
+                            ui.vertical(|ui| {
+                                ui.label(RichText::new("Fn-Lock").size(13.0).strong().color(ON_SURFACE));
+                                ui.label(RichText::new("F1-F12 Keys").size(10.0).color(OUTLINE_MUTED));
+                            });
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                let mut fn_l = state.platform.fn_lock.unwrap_or(false);
+                                if m3_switch(ui, &mut fn_l) {
+                                    if platform::set_fn_lock(fn_l).is_ok() {
+                                        notify(format!("Fn-Lock: {}", if fn_l { "Enabled" } else { "Disabled" }));
+                                    }
+                                }
+                            });
+                        });
+                    });
+
+                // Control 5: Camera Hardware E-Shutter
+                Frame::none()
+                    .fill(SURFACE_CONTAINER)
+                    .rounding(Rounding::same(20.0))
+                    .inner_margin(Margin::same(14.0))
+                    .show(&mut cols[4], |ui| {
                         let cam_on = state.platform.camera_power.unwrap_or(false);
                         ui.horizontal(|ui| {
-                            let (icon_rect, _) = ui.allocate_exact_size(Vec2::splat(24.0), egui::Sense::hover());
+                            let (icon_rect, _) = ui.allocate_exact_size(Vec2::splat(22.0), egui::Sense::hover());
                             draw_icon_camera(ui.painter(), icon_rect, if cam_on { COLOR_SUCCESS } else { COLOR_PERF }, cam_on);
-                            ui.add_space(4.0);
+                            ui.add_space(2.0);
                             ui.vertical(|ui| {
-                                ui.label(RichText::new("Camera Privacy").size(14.0).strong().color(ON_SURFACE));
-                                let status_str = if cam_on { "Active (Open)" } else { "Shutter Killed" };
-                                ui.label(RichText::new(status_str).size(11.0).color(if cam_on { COLOR_SUCCESS } else { COLOR_PERF }));
+                                ui.label(RichText::new("E-Shutter").size(13.0).strong().color(ON_SURFACE));
+                                let status_str = if cam_on { "Open" } else { "Killed" };
+                                ui.label(RichText::new(status_str).size(10.0).color(if cam_on { COLOR_SUCCESS } else { COLOR_PERF }));
                             });
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                 let mut cam_state = state.platform.camera_power.unwrap_or(false);

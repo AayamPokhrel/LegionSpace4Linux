@@ -1,7 +1,7 @@
 use eframe::egui::{self, Frame, Margin, RichText, Rounding, Vec2};
 use legion_cli::hardware::{battery, platform};
 
-use crate::icons::{draw_icon_battery, draw_icon_camera, draw_icon_power};
+use crate::icons::{draw_icon_battery, draw_icon_camera, draw_icon_keyboard, draw_icon_power};
 use crate::telemetry::AppStateSnapshot;
 use crate::theme::*;
 use crate::widgets::{m3_progress_bar, m3_ring_gauge, m3_switch};
@@ -22,7 +22,7 @@ pub fn render_battery(
                 ui.add_space(4.0);
                 ui.vertical(|ui| {
                     ui.label(RichText::new("Battery Care & Hardware Privacy").size(20.0).strong().color(ON_SURFACE));
-                    ui.label(RichText::new("Conservation threshold limiter, power delivery metrics, and physical e-shutter").size(12.0).color(OUTLINE_MUTED));
+                    ui.label(RichText::new("Conservation threshold limiter, rapid charge, power delivery metrics, and physical e-shutter").size(12.0).color(OUTLINE_MUTED));
                 });
             });
 
@@ -82,7 +82,7 @@ pub fn render_battery(
                                 ui.add_space(4.0);
                                 ui.vertical(|ui| {
                                     ui.label(RichText::new("Battery Conservation (80%)").strong().color(ON_SURFACE));
-                                    ui.label(RichText::new("Prolongs battery longevity when on AC").size(11.0).color(OUTLINE_MUTED));
+                                    ui.label(RichText::new("Prolongs battery longevity when plugged in").size(11.0).color(OUTLINE_MUTED));
                                 });
                                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                     let mut cons = b.conservation_mode;
@@ -94,7 +94,28 @@ pub fn render_battery(
                                 });
                             });
 
-                            ui.add_space(18.0);
+                            ui.add_space(16.0);
+
+                            // Rapid Charge Switch
+                            ui.horizontal(|ui| {
+                                let (icon_rect, _) = ui.allocate_exact_size(Vec2::splat(24.0), egui::Sense::hover());
+                                draw_icon_power(ui.painter(), icon_rect, COLOR_PERF);
+                                ui.add_space(4.0);
+                                ui.vertical(|ui| {
+                                    ui.label(RichText::new("Rapid Charge Mode").strong().color(ON_SURFACE));
+                                    ui.label(RichText::new("Fast charge 0-70% in 30 mins (Clears Conservation)").size(11.0).color(OUTLINE_MUTED));
+                                });
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    let mut rapid = state.platform.rapid_charge.unwrap_or(false);
+                                    if m3_switch(ui, &mut rapid) {
+                                        if platform::set_rapid_charge(rapid).is_ok() {
+                                            notify(format!("Rapid Charge: {}", if rapid { "Enabled (Fast Charging)" } else { "Disabled" }));
+                                        }
+                                    }
+                                });
+                            });
+
+                            ui.add_space(16.0);
 
                             // Always-On USB Switch
                             ui.horizontal(|ui| {
@@ -115,7 +136,28 @@ pub fn render_battery(
                                 });
                             });
 
-                            ui.add_space(18.0);
+                            ui.add_space(16.0);
+
+                            // Fn-Lock Switch
+                            ui.horizontal(|ui| {
+                                let (icon_rect, _) = ui.allocate_exact_size(Vec2::splat(24.0), egui::Sense::hover());
+                                draw_icon_keyboard(ui.painter(), icon_rect, PRIMARY);
+                                ui.add_space(4.0);
+                                ui.vertical(|ui| {
+                                    ui.label(RichText::new("Fn-Lock Key Mode").strong().color(ON_SURFACE));
+                                    ui.label(RichText::new("F1-F12 direct vs Lenovo hotkeys").size(11.0).color(OUTLINE_MUTED));
+                                });
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    let mut fn_l = state.platform.fn_lock.unwrap_or(false);
+                                    if m3_switch(ui, &mut fn_l) {
+                                        if platform::set_fn_lock(fn_l).is_ok() {
+                                            notify(format!("Fn-Lock: {}", if fn_l { "Enabled (F1-F12 direct)" } else { "Disabled (Hotkeys direct)" }));
+                                        }
+                                    }
+                                });
+                            });
+
+                            ui.add_space(16.0);
 
                             // Camera Hardware Switch
                             let cam_on = state.platform.camera_power.unwrap_or(false);
@@ -142,4 +184,3 @@ pub fn render_battery(
             }
         });
 }
-
