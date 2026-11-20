@@ -60,6 +60,7 @@ pub struct PlatformFeatures {
     pub fn_lock: Option<bool>,
     pub usb_charging: Option<bool>,
     pub conservation_mode: Option<bool>,
+    pub rapid_charge: Option<bool>,
     pub fan_mode: Option<u32>,
 }
 
@@ -85,8 +86,30 @@ pub fn get_platform_features() -> PlatformFeatures {
         fn_lock: read_bool("fn_lock"),
         usb_charging: read_bool("usb_charging"),
         conservation_mode: read_bool("conservation_mode"),
+        rapid_charge: Some(get_rapid_charge()),
         fan_mode: read_u32("fan_mode"),
     }
+}
+
+pub fn set_fn_lock(enable: bool) -> Result<bool> {
+    let node = get_vpc_node("fn_lock")
+        .ok_or_else(|| LegionError::UnsupportedFeature("VPC fn_lock not found".into()))?;
+    fs::write(node, if enable { "1" } else { "0" }).map_err(LegionError::Io)?;
+    Ok(enable)
+}
+
+pub fn get_rapid_charge() -> bool {
+    if let Ok(types) = fs::read_to_string("/sys/class/power_supply/BAT0/charge_types") {
+        return types.contains("[Fast]") || types.contains("Fast");
+    }
+    false
+}
+
+pub fn set_rapid_charge(enable: bool) -> Result<bool> {
+    let path = "/sys/class/power_supply/BAT0/charge_types";
+    let val = if enable { "Fast" } else { "Normal" };
+    let _ = fs::write(path, val);
+    Ok(enable)
 }
 
 pub fn get_camera_power() -> Result<bool> {

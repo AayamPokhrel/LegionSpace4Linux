@@ -53,6 +53,12 @@ pub enum Commands {
     #[command(about = "Manage hardware camera e-shutter privacy switch")]
     Camera(CameraCmd),
 
+    #[command(about = "Manage OLED care, anti-burn protection, pixel shift, and display overdrive")]
+    Oled(OledCmd),
+
+    #[command(about = "Manage Fn-Lock key mode (F1-F12 vs media hotkeys)")]
+    FnLock(FnLockCmd),
+
     #[command(
         alias = "rgb",
         about = "Control 4-zone RGB lighting, ACPI backlight, and Fn-Lock"
@@ -139,6 +145,12 @@ pub enum BatteryAction {
 
     #[command(about = "Toggle always-on USB charging while laptop is off/sleeping")]
     UsbCharge {
+        #[arg(help = "State: on/enable/1 or off/disable/0")]
+        state: Option<ToggleState>,
+    },
+
+    #[command(about = "Toggle battery rapid charging mode (fast charging 0-70% in 30 mins)")]
+    RapidCharge {
         #[arg(help = "State: on/enable/1 or off/disable/0")]
         state: Option<ToggleState>,
     },
@@ -260,6 +272,69 @@ pub enum GpuAction {
 
     #[command(about = "Reset GPU graphics core clocks to automatic driver management")]
     ResetClocks,
+
+    #[command(about = "Get or set GPU working mode (hybrid, dgpu, igpu, auto)")]
+    Mode {
+        #[arg(help = "Target mode: hybrid (Optimus), dgpu (Discrete only), igpu (Eco/Integrated), auto (Hybrid-Auto)")]
+        mode: Option<String>,
+    },
+
+    #[command(about = "Get or set NVIDIA GPUPowerMizerMode (0 = Adaptive, 1 = Prefer Maximum Performance, 2 = Auto)")]
+    Powermizer {
+        #[arg(help = "Mode level (0 = Adaptive, 1 = Max Performance, 2 = Auto)")]
+        level: Option<u32>,
+    },
+
+    #[command(about = "List applications and processes currently utilizing the discrete NVIDIA GPU")]
+    Apps,
+}
+
+// ----------------------------------------------------------------------------
+// Fn-Lock Subcommands
+// ----------------------------------------------------------------------------
+#[derive(Args, Debug)]
+pub struct FnLockCmd {
+    #[arg(help = "State: on/enable/1 or off/disable/0")]
+    pub state: Option<ToggleState>,
+}
+
+// ----------------------------------------------------------------------------
+// OLED & Display Care Subcommands
+// ----------------------------------------------------------------------------
+#[derive(Args, Debug)]
+pub struct OledCmd {
+    #[command(subcommand)]
+    pub action: Option<OledAction>,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum OledAction {
+    #[command(about = "Display OLED care, pixel shift, and anti-burn protection status")]
+    Status,
+
+    #[command(about = "Configure OLED care settings")]
+    Set {
+        #[arg(long, help = "Master OLED anti-burn protection (on/off)")]
+        master: Option<ToggleState>,
+
+        #[arg(long, help = "Pixel shift periodic micro-translations (on/off)")]
+        pixel_shift: Option<ToggleState>,
+
+        #[arg(long, help = "Static taskbar dimming protection (on/off)")]
+        taskbar_dim: Option<ToggleState>,
+
+        #[arg(long, help = "Default system dark mode (on/off)")]
+        dark_mode: Option<ToggleState>,
+
+        #[arg(long, help = "LCD panel overdrive / response time accelerator (on/off)")]
+        overdrive: Option<ToggleState>,
+
+        #[arg(long, help = "Adaptive refresh rate (Fn+R dynamic 60Hz/165Hz) (on/off)")]
+        adaptive_rr: Option<ToggleState>,
+    },
+
+    #[command(about = "Trigger or reset panel pixel clean cycle tracker (4-hour maintenance)")]
+    Clean,
 }
 
 // ----------------------------------------------------------------------------

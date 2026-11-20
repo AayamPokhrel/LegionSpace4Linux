@@ -1,6 +1,6 @@
 use crate::cli::*;
 use crate::error::{LegionError, Result};
-use crate::hardware::{battery, custom_mode, fan, gpu, lighting, platform, probe, thermal};
+use crate::hardware::{battery, custom_mode, fan, gpu, gpu_modes, lighting, oled, platform, probe, thermal};
 use crate::status;
 use colored::*;
 use serde::Serialize;
@@ -64,6 +64,8 @@ fn dispatch(cli: &Cli) -> Result<()> {
         Some(Commands::Custom(cmd)) => handle_custom(cmd, cli.json),
         Some(Commands::Gpu(cmd)) => handle_gpu(cmd, cli.json),
         Some(Commands::Camera(cmd)) => handle_camera(cmd, cli.json),
+        Some(Commands::Oled(cmd)) => handle_oled(cmd, cli.json),
+        Some(Commands::FnLock(cmd)) => handle_fn_lock(cmd, cli.json),
         Some(Commands::Lighting(cmd)) => handle_lighting(cmd, cli.json),
     }
 }
@@ -358,6 +360,39 @@ fn handle_battery(cmd: &BatteryCmd, json: bool) -> Result<()> {
                 }
             }
         }
+        Some(BatteryAction::RapidCharge { state }) => {
+            match state {
+                Some(st) => {
+                    let enable = st.is_enabled();
+                    platform::set_rapid_charge(enable)?;
+                    if json {
+                        let resp = ActionResponse {
+                            success: true,
+                            action: "battery_rapid_charge_set",
+                            data: enable,
+                        };
+                        println!("{}", serde_json::to_string_pretty(&resp).unwrap());
+                    } else {
+                        println!(
+                            "{} Rapid Charge mode set to: {}",
+                            "[OK]".green().bold(),
+                            if enable { "Enabled (0-70% in 30 mins)".green() } else { "Disabled".white() }
+                        );
+                    }
+                }
+                None => {
+                    let rapid = platform::get_rapid_charge();
+                    if json {
+                        println!("{}", serde_json::json!({ "rapid_charge": rapid }));
+                    } else {
+                        println!(
+                            "Rapid Charge is currently: {}",
+                            if rapid { "ENABLED".green().bold() } else { "DISABLED".white() }
+                        );
+                    }
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -563,6 +598,168 @@ fn handle_gpu(cmd: &GpuCmd, json: bool) -> Result<()> {
                 println!("{}", serde_json::json!({"success": true, "reset_clocks": true}));
             } else {
                 println!("{} Reset GPU clocks to automatic management.", "[OK]".green().bold());
+            }
+        }
+        Some(GpuAction::Mode { mode }) => {
+            match mode {
+                Some(m_str) => {
+                    let target_mode: gpu_modes::GpuWorkingMode = m_str.parse()?;
+                    let res = gpu_modes::set_gpu_working_mode(target_mode)?;
+                    if json {
+                        let resp = ActionResponse {
+                            success: true,
+                            action: "gpu_mode_set",
+                            data: &res,
+                        };
+                        println!("{}", serde_json::to_string_pretty(&resp).unwrap());
+                    } else {
+                        println!("{} GPU Working Mode set to: {}", "[OK]".green().bold(), res.active_mode.to_string().cyan().bold());
+                        println!("  MUX Switch:        {}", res.mux_status);
+                        println!("  Runtime PM Status: {}", res.dgpu_power_state);
+                    }
+                }
+                None => {
+                    let st = gpu_modes::get_gpu_mode_status();
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&st).unwrap());
+                    } else {
+                        println!("{}", "GPU Working Mode & MUX Status:".cyan().bold());
+                        println!("  Active Mode:       {}", st.active_mode.to_string().green().bold());
+                        println!("  Hardware MUX:      {}", st.mux_status);
+                        println!("  dGPU Power State:  {}", st.dgpu_power_state);
+                        println!("  Power Source:      {}", if st.ac_connected { "AC Adapter" } else { "Battery (DC)" });
+                        if let Some(pm) = st.powermizer_mode {
+                            let pm_desc = match pm {
+                                1 => "Prefer Maximum Performance (1)",
+                                2 => "Auto (2)",
+                                _ => "Adaptive (0)",
+                            };
+                            println!("  PowerMizer Mode:   {}", pm_desc);
+                        }
+                    }
+                }
+            }
+        }
+        Some(GpuAction::Powermizer { level }) => {
+            match level {
+                Some(lvl) => {
+                    gpu_modes::set_powermizer_mode(*lvl)?;
+                    if json {
+                        println!("{}", serde_json::json!({"success": true, "powermizer_mode": lvl}));
+                    } else {
+                        println!("{} Set GPUPowerMizerMode to {}.", "[OK]".green().bold(), lvl);
+                    }
+                }
+                None => {
+                    let mode = gpu_modes::get_powermizer_mode().unwrap_or(0);
+                    if json {
+                        println!("{}", serde_json::json!({"powermizer_mode": mode}));
+                    } else {
+                        println!("GPUPowerMizerMode is currently: {}", mode);
+                    }
+                }
+            }
+        }
+        Some(GpuAction::Apps) => {
+            let procs = gpu_modes::get_gpu_processes();
+            if json {
+                println!("{}", serde_json::to_string_pretty(&procs).unwrap());
+            } else {
+                println!("{}", "Applications Utilizing Discrete NVIDIA GPU:".cyan().bold());
+                if procs.is_empty() {
+                    println!("  No active compute/graphics applications detected on dGPU.");
+                } else {
+                    for p in procs {
+                        println!("  PID {:<7} {:<30} (VRAM: {} MiB)", p.pid, p.name.green(), p.used_memory_mib);
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+// ----------------------------------------------------------------------------
+// OLED & Display Care Handlers
+// ----------------------------------------------------------------------------
+fn handle_oled(cmd: &OledCmd, json: bool) -> Result<()> {
+    match &cmd.action {
+        None | Some(OledAction::Status) => {
+            let settings = oled::load_oled_settings();
+            if json {
+                println!("{}", serde_json::to_string_pretty(&settings).unwrap());
+            } else {
+                println!("{}", "OLED & Display Care Protection Suite:".cyan().bold());
+                println!("  Master OLED Protection:  {}", if settings.master_oled_protection { "Enabled".green() } else { "Disabled".yellow() });
+                println!("  Pixel Shift (Anti-Burn): {}", if settings.pixel_shift_enabled { "Enabled".green() } else { "Disabled".yellow() });
+                println!("  Static Taskbar Dimming:  {}", if settings.taskbar_dimming_enabled { "Enabled".green() } else { "Disabled".yellow() });
+                println!("  Default Dark Mode:       {}", if settings.default_dark_mode { "Enabled".green() } else { "Disabled".yellow() });
+                println!("  LCD Panel OverDrive:     {}", if settings.lcd_overdrive_enabled { "Enabled".green() } else { "Disabled".yellow() });
+                println!("  Adaptive Refresh Rate:   {}", if settings.adaptive_refresh_rate { "Enabled".green() } else { "Disabled".yellow() });
+                let hours = settings.screen_on_seconds as f64 / 3600.0;
+                println!("  Panel On-Time (Tracker): {:.1} hours / 4.0 hours", hours);
+                println!("  Pixel Clean Cycle Due:   {}", if settings.clean_reminder_due { "YES (Run Clean Cycle!)".red().bold() } else { "No".green() });
+            }
+        }
+        Some(OledAction::Set {
+            master,
+            pixel_shift,
+            taskbar_dim,
+            dark_mode,
+            overdrive,
+            adaptive_rr,
+        }) => {
+            let updated = oled::update_oled_settings(
+                master.map(|s| s.is_enabled()),
+                pixel_shift.map(|s| s.is_enabled()),
+                taskbar_dim.map(|s| s.is_enabled()),
+                dark_mode.map(|s| s.is_enabled()),
+                overdrive.map(|s| s.is_enabled()),
+                adaptive_rr.map(|s| s.is_enabled()),
+            )?;
+            if json {
+                let resp = ActionResponse {
+                    success: true,
+                    action: "oled_settings_updated",
+                    data: &updated,
+                };
+                println!("{}", serde_json::to_string_pretty(&resp).unwrap());
+            } else {
+                println!("{} OLED Care settings successfully updated.", "[OK]".green().bold());
+            }
+        }
+        Some(OledAction::Clean) => {
+            let updated = oled::reset_pixel_clean_timer()?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&updated).unwrap());
+            } else {
+                println!("{} OLED panel pixel clean maintenance cycle completed & timer reset.", "[OK]".green().bold());
+            }
+        }
+    }
+    Ok(())
+}
+
+// ----------------------------------------------------------------------------
+// Fn-Lock Handlers
+// ----------------------------------------------------------------------------
+fn handle_fn_lock(cmd: &FnLockCmd, json: bool) -> Result<()> {
+    match cmd.state {
+        Some(st) => {
+            let enable = st.is_enabled();
+            platform::set_fn_lock(enable)?;
+            if json {
+                println!("{}", serde_json::json!({"success": true, "fn_lock": enable}));
+            } else {
+                println!("{} Fn-Lock set to: {}", "[OK]".green().bold(), if enable { "Enabled (F1-F12 keys direct)" } else { "Disabled (Media hotkeys direct)" });
+            }
+        }
+        None => {
+            let state = platform::get_platform_features().fn_lock.unwrap_or(false);
+            if json {
+                println!("{}", serde_json::json!({"fn_lock": state}));
+            } else {
+                println!("Fn-Lock is currently: {}", if state { "Enabled (F1-F12 direct)".green() } else { "Disabled (Hotkeys direct)".white() });
             }
         }
     }
