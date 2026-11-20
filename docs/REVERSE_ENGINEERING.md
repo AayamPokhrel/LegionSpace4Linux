@@ -151,6 +151,68 @@ Reversed from `SEBasicLighting64.dll` (`0x1800B6CD2`, `0x1800B7260`):
 
 ---
 
+### 2.5 GPU Working Modes & Display MUX Switch
+
+#### Windows Vendor Implementation (`SEGSync64.dll`)
+Disassembled methods and contracts:
+- `HybridMode`, `HybridDGPUMode`, `HybridIGPUMode`, `HybridAutoMode`
+- `Get-MDMMode`, `Set-MDMMode`, `DisplayMuxDevice` (Windows.Devices.Display.Core)
+- `get_app_run_gpu`, `close_all_apps_gpu`
+
+#### Linux Hardware Grounding & Implementation
+- **Hardware MUX**: Parade `PS8371` eDP MUX switch (`MMID` package in ACPI `SSDT4.dsl`).
+  - `card1-eDP-2`: Direct NVIDIA RTX 5060 dGPU pipeline.
+  - `card2-eDP-1`: Integrated AMD Raphael iGPU pipeline.
+- **Operating Modes**:
+  1. **Hybrid (Optimus)**: PCI runtime power management set to `auto` (`/sys/bus/pci/devices/0000:01:00.0/power/control`), dynamic on-demand render offload.
+  2. **dGPU Mode**: Hardware MUX forced direct to NVIDIA RTX 5060, power control `on`, PowerMizer mode 1 (Prefer Maximum Performance).
+  3. **Hybrid-iGPU Mode (Eco)**: Discrete GPU powered down into `D3cold` (`/sys/bus/pci/devices/0000:01:00.0/d3cold_allowed = 1`), internal display driven exclusively by AMD Radeon 610M iGPU.
+  4. **Hybrid-Auto Mode**: Dynamic power sensing via AC adapter status (`/sys/class/power_supply/ADP0/online`). Automatically engages Hybrid/dGPU on AC and forces Eco mode on DC battery.
+- **PowerMizer Tuning**: Configured via `nvidia-settings -a [gpu:0]/GPUPowerMizerMode=N` (0 = Adaptive, 1 = Max Performance, 2 = Auto).
+- **Process Telemetry**: Active GPU compute/graphics processes parsed from `nvidia-smi --query-compute-apps=pid,process_name,used_gpu_memory`.
+
+---
+
+### 2.6 OLED Protection & Display Care Suite
+
+#### Windows Vendor Implementation (`SEOledAntiBurnt64.dll`, `SEBiosODPlugin64.dll`, `SEAdaptiveRefreshRatePlugin64.dll`)
+Disassembled routines and symbols:
+- `auto_shift_wallpapers` (`AutoShiftWallPaper`)
+- `default_dark_Mode` (`DefaultDarkMode`)
+- `get_oled_anti_burnt_settings`, `set_oled_anti_burnt_settings`, `oledCheck`
+- `get_OD_status`, `set_OD_status` (LCD OverDrive response time accelerator)
+- `FnR2Status` (Fn+R dynamic refresh rate switching)
+
+#### Linux Hardware Grounding & Implementation
+- **Pixel Shift**: Sub-pixel micro-translations every 2-3 minutes to prevent static burn-in on fixed UI elements.
+- **Default Dark Mode**: GNOME desktop sync via `gsettings set org.gnome.desktop.interface color-scheme prefer-dark`.
+- **Static Taskbar Dimming**: Dimming persistent desktop elements and static icons.
+- **4-Hour Clean Cycle Tracker**: Tracks panel active on-time (`screen_on_seconds >= 14400`) and reminds user to perform panel calibration refresh.
+- **LCD OverDrive (OD)**: Panel response time overdrive booster for gaming.
+- **Adaptive Refresh Rate**: Dynamic mode switching between 60 Hz on battery and native 165/240 Hz on AC power.
+
+---
+
+### 2.7 Rapid Charge & Fn-Lock Controls
+
+#### ACPI EC Control Method (`Method SBMC`)
+From decompiled `DSDT.dsl`:
+```asl
+Method (SBMC, 1, Serialized)
+{
+    If ((Arg0 == 0x03)) { BTSM = 0x01 } // Conservation Mode ON (80% charge limit)
+    If ((Arg0 == 0x05)) { BTSM = 0x00 } // Conservation Mode OFF
+    If ((Arg0 == 0x07)) { QCHG = 0x01; BTSM = 0x00 } // Rapid Charge ON (clears Conservation)
+    If ((Arg0 == 0x08)) { QCHG = 0x00 } // Rapid Charge OFF
+    If ((Arg0 == 0x09)) { CAMM = 0x01 } // Camera E-Shutter ON
+    If ((Arg0 == 0x10)) { CAMM = 0x00 } // Camera E-Shutter OFF
+}
+```
+- **Rapid Charge**: Managed via `/sys/class/power_supply/BAT0/charge_types` (`Fast` vs `Normal`).
+- **Fn-Lock**: Managed via `/sys/devices/pci0000:00/0000:00:14.3/PNP0C09:00/VPC2004:00/fn_lock` (1 = F1-F12 direct, 0 = hotkeys direct).
+
+---
+
 ## 3. Physical Hardware Verification
 
 Verification performed on physical machine:
