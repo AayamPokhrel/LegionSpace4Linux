@@ -23,12 +23,15 @@ def search_keywords(strings, keywords):
         results[kw] = [s for s in strings if re.search(r'\b' + re.escape(kw) + r'\b', s, re.IGNORECASE) or kw.lower() in s.lower()]
     return results
 
+home_dir = os.path.expanduser("~")
+dll_base = os.environ.get("LEGION_DLL_DIR", os.path.join(home_dir, "Legion_Space", "extracted"))
+
 dlls = [
-    "/home/aayam422h/Legion_Space/extracted/se/plugins/SEThermalModePlugin/SEThermalModePlugin64.dll",
-    "/home/aayam422h/Legion_Space/extracted/se/plugins/SEPowerBatteryPlugin/SEPowerBatteryPlugin64.dll",
-    "/home/aayam422h/Legion_Space/extracted/se/plugins/SYSCore/SYSCore64.dll",
-    "/home/aayam422h/Legion_Space/extracted/se/lgtplugins/SEBasicLighting/SEBasicLighting64.dll",
-    "/home/aayam422h/Legion_Space/extracted/se/plugins/SELuminousNB/SELuminousNB64.dll",
+    os.path.join(dll_base, "se/plugins/SEThermalModePlugin/SEThermalModePlugin64.dll"),
+    os.path.join(dll_base, "se/plugins/SEPowerBatteryPlugin/SEPowerBatteryPlugin64.dll"),
+    os.path.join(dll_base, "se/plugins/SYSCore/SYSCore64.dll"),
+    os.path.join(dll_base, "se/lgtplugins/SEBasicLighting/SEBasicLighting64.dll"),
+    os.path.join(dll_base, "se/plugins/SELuminousNB/SELuminousNB64.dll"),
 ]
 
 for d in dlls:

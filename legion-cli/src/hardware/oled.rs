@@ -1,11 +1,13 @@
 use crate::error::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const OLED_CONFIG_PATH: &str = "/home/aayam422h/.config/legionspace/oled.json";
+pub fn get_oled_config_path() -> PathBuf {
+    crate::hardware::gpu_modes::get_config_dir().join("oled.json")
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OledCareSettings {
@@ -40,7 +42,8 @@ impl Default for OledCareSettings {
 }
 
 pub fn load_oled_settings() -> OledCareSettings {
-    if let Ok(data) = fs::read_to_string(OLED_CONFIG_PATH) {
+    let path = get_oled_config_path();
+    if let Ok(data) = fs::read_to_string(&path) {
         if let Ok(mut settings) = serde_json::from_str::<OledCareSettings>(&data) {
             // Check if clean reminder is due (>= 4 hours = 14400 seconds)
             settings.clean_reminder_due = settings.screen_on_seconds >= 14400;
@@ -51,13 +54,15 @@ pub fn load_oled_settings() -> OledCareSettings {
 }
 
 pub fn save_oled_settings(settings: &OledCareSettings) {
-    if let Some(parent) = Path::new(OLED_CONFIG_PATH).parent() {
+    let path = get_oled_config_path();
+    if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
+        crate::hardware::gpu_modes::fix_file_owner(parent);
     }
-    let _ = fs::write(
-        OLED_CONFIG_PATH,
-        serde_json::to_string_pretty(settings).unwrap_or_default(),
-    );
+    if let Ok(data) = serde_json::to_string_pretty(settings) {
+        let _ = fs::write(&path, data);
+        crate::hardware::gpu_modes::fix_file_owner(&path);
+    }
 }
 
 pub fn set_system_dark_mode(enable: bool) -> Result<()> {
@@ -73,9 +78,9 @@ pub fn reset_pixel_clean_timer() -> Result<OledCareSettings> {
     settings.screen_on_seconds = 0;
     settings.clean_reminder_due = false;
     settings.last_clean_timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
     save_oled_settings(&settings);
     Ok(settings)
 }
@@ -113,4 +118,3 @@ pub fn update_oled_settings(
     save_oled_settings(&settings);
     Ok(settings)
 }
-

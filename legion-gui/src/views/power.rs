@@ -35,7 +35,7 @@ impl Default for PowerSliders {
 
 pub fn render_power(
     ui: &mut egui::Ui,
-    state: &AppStateSnapshot,
+    state: &mut AppStateSnapshot,
     sliders: &mut PowerSliders,
     notify: &mut impl FnMut(String),
 ) {
@@ -149,6 +149,7 @@ pub fn render_power(
 
             if let Some(target_mode) = switch_mode {
                 if let Ok(updated) = gpu_modes::set_gpu_working_mode(target_mode) {
+                    state.gpu_mode = updated.clone();
                     notify(format!("Switched GPU Mode to {}", updated.active_mode));
                 }
             }
@@ -230,6 +231,7 @@ pub fn render_power(
 
                     if ui.add(chip_btn).clicked() {
                         if gpu_modes::set_powermizer_mode(lvl).is_ok() {
+                            state.gpu_mode.powermizer_mode = Some(lvl);
                             notify(format!("PowerMizer set to: {}", label));
                         }
                     }

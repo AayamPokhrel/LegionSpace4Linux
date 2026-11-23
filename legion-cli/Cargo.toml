@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["AayamPokhrel <pokhrelaayam1010@gmail.com>"]
 description = "Native Linux userspace driver and CLI utility for Lenovo Legion laptops"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/aayam422h/Legion_Space"
+repository = "https://github.com/AayamPokhrel/LegionSpace4Linux"
 default-run = "legion-cli"
 
 [lib]

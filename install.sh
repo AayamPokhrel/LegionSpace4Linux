@@ -168,17 +168,13 @@ with open(flake_path, "r") as f:
 
 if "legion-linux" not in flake_content:
     print("      -> Adding legion-linux input to flake.nix...")
-    target_input = '    ajazz-ak820-max = {\n      url = "path:/home/aayam422h/AJAZ/ajazz-ak820-max";\n      inputs.nixpkgs.follows = "nixpkgs";\n    };\n'
     new_input = f"""    legion-linux = {{
       url = "path:{repo_path}";
       inputs.nixpkgs.follows = "nixpkgs";
     }};
 """
-    if target_input in flake_content:
-        flake_content = flake_content.replace(target_input, target_input + new_input)
-    else:
-        target_alt = "\n  };\n\n  outputs = {"
-        flake_content = flake_content.replace(target_alt, "\n" + new_input + "  };\n\n  outputs = {")
+    target_alt = "\n  };\n\n  outputs = {"
+    flake_content = flake_content.replace(target_alt, "\n" + new_input + "  };\n\n  outputs = {")
     
     if "legion-linux," not in flake_content:
         flake_content = flake_content.replace("outputs = {", "outputs = { legion-linux, ")

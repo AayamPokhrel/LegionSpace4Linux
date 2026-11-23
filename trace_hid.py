@@ -72,6 +72,9 @@ def analyze_dll(dll_path):
                 if sub_insn.address == addr:
                     break
 
-analyze_dll("/home/aayam422h/Legion_Space/extracted/se/lgtplugins/SEBasicLighting/SEBasicLighting64.dll")
-analyze_dll("/home/aayam422h/Legion_Space/extracted/se/plugins/SELuminousNB/SELuminousNB64.dll")
+home_dir = os.path.expanduser("~")
+dll_base = os.environ.get("LEGION_DLL_DIR", os.path.join(home_dir, "Legion_Space", "extracted"))
+
+analyze_dll(os.path.join(dll_base, "se/lgtplugins/SEBasicLighting/SEBasicLighting64.dll"))
+analyze_dll(os.path.join(dll_base, "se/plugins/SELuminousNB/SELuminousNB64.dll"))
 

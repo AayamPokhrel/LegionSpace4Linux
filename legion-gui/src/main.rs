@@ -263,9 +263,9 @@ impl eframe::App for LegionSpaceApp {
                     };
 
                     match self.current_tab {
-                        AppTab::Dashboard => views::dashboard::render_dashboard(ui, &self.state, &mut notify_fn),
-                        AppTab::CustomMode => views::power::render_power(ui, &self.state, &mut self.power_sliders, &mut notify_fn),
-                        AppTab::Oled => views::oled::render_oled(ui, &self.state, &mut notify_fn),
+                        AppTab::Dashboard => views::dashboard::render_dashboard(ui, &mut self.state, &mut notify_fn),
+                        AppTab::CustomMode => views::power::render_power(ui, &mut self.state, &mut self.power_sliders, &mut notify_fn),
+                        AppTab::Oled => views::oled::render_oled(ui, &mut self.state, &mut notify_fn),
                         AppTab::Cooling => views::cooling::render_cooling(ui, &self.state, &mut self.slider_fan_rpm, &mut notify_fn),
                         AppTab::Battery => views::battery::render_battery(ui, &self.state, &mut notify_fn),
                         AppTab::Lighting => views::lighting::render_lighting(ui, &mut self.lighting_state, &mut notify_fn),

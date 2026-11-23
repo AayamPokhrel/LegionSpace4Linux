@@ -8,10 +8,11 @@ use crate::widgets::{m3_progress_bar, m3_switch};
 
 pub fn render_oled(
     ui: &mut egui::Ui,
-    state: &AppStateSnapshot,
+    state: &mut AppStateSnapshot,
     notify: &mut impl FnMut(String),
 ) {
-    let oled_cfg = &state.oled;
+    let oled_cfg = state.oled.clone();
+    let mut updated_oled = None;
 
     // ==============================================================================
     // 1. Hero Card: Display & OLED Care Suite
@@ -62,7 +63,8 @@ pub fn render_oled(
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                 let mut master = oled_cfg.master_oled_protection;
                                 if m3_switch(ui, &mut master) {
-                                    if oled::update_oled_settings(Some(master), None, None, None, None, None).is_ok() {
+                                    if let Ok(new_cfg) = oled::update_oled_settings(Some(master), None, None, None, None, None) {
+                                        updated_oled = Some(new_cfg);
                                         notify(format!("Master OLED Protection: {}", if master { "Enabled" } else { "Disabled" }));
                                     }
                                 }
@@ -80,7 +82,8 @@ pub fn render_oled(
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                 let mut shift = oled_cfg.pixel_shift_enabled;
                                 if m3_switch(ui, &mut shift) {
-                                    if oled::update_oled_settings(None, Some(shift), None, None, None, None).is_ok() {
+                                    if let Ok(new_cfg) = oled::update_oled_settings(None, Some(shift), None, None, None, None) {
+                                        updated_oled = Some(new_cfg);
                                         notify(format!("Pixel Shift: {}", if shift { "Enabled" } else { "Disabled" }));
                                     }
                                 }
@@ -98,7 +101,8 @@ pub fn render_oled(
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                 let mut dim = oled_cfg.taskbar_dimming_enabled;
                                 if m3_switch(ui, &mut dim) {
-                                    if oled::update_oled_settings(None, None, Some(dim), None, None, None).is_ok() {
+                                    if let Ok(new_cfg) = oled::update_oled_settings(None, None, Some(dim), None, None, None) {
+                                        updated_oled = Some(new_cfg);
                                         notify(format!("Taskbar Dimming: {}", if dim { "Enabled" } else { "Disabled" }));
                                     }
                                 }
@@ -116,7 +120,8 @@ pub fn render_oled(
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                 let mut dark = oled_cfg.default_dark_mode;
                                 if m3_switch(ui, &mut dark) {
-                                    if oled::update_oled_settings(None, None, None, Some(dark), None, None).is_ok() {
+                                    if let Ok(new_cfg) = oled::update_oled_settings(None, None, None, Some(dark), None, None) {
+                                        updated_oled = Some(new_cfg);
                                         notify(format!("Default Dark Mode: {}", if dark { "Enabled" } else { "Disabled" }));
                                     }
                                 }
@@ -142,7 +147,8 @@ pub fn render_oled(
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                 let mut od = oled_cfg.lcd_overdrive_enabled;
                                 if m3_switch(ui, &mut od) {
-                                    if oled::update_oled_settings(None, None, None, None, Some(od), None).is_ok() {
+                                    if let Ok(new_cfg) = oled::update_oled_settings(None, None, None, None, Some(od), None) {
+                                        updated_oled = Some(new_cfg);
                                         notify(format!("LCD OverDrive: {}", if od { "Enabled" } else { "Disabled" }));
                                     }
                                 }
@@ -160,7 +166,8 @@ pub fn render_oled(
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                 let mut arr = oled_cfg.adaptive_refresh_rate;
                                 if m3_switch(ui, &mut arr) {
-                                    if oled::update_oled_settings(None, None, None, None, None, Some(arr)).is_ok() {
+                                    if let Ok(new_cfg) = oled::update_oled_settings(None, None, None, None, None, Some(arr)) {
+                                        updated_oled = Some(new_cfg);
                                         notify(format!("Adaptive Refresh Rate: {}", if arr { "Enabled" } else { "Disabled" }));
                                     }
                                 }
@@ -232,12 +239,17 @@ pub fn render_oled(
                             .min_size(Vec2::new(240.0, 40.0));
 
                         if ui.add(clean_btn).clicked() {
-                            if oled::reset_pixel_clean_timer().is_ok() {
+                            if let Ok(new_cfg) = oled::reset_pixel_clean_timer() {
+                                updated_oled = Some(new_cfg);
                                 notify("OLED Pixel Clean cycle completed and 4-hour timer reset!".to_string());
                             }
                         }
                     });
                 });
         });
+
+    if let Some(new_cfg) = updated_oled {
+        state.oled = new_cfg;
+    }
 }
 

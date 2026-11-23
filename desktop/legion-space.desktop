@@ -4,11 +4,10 @@ Type=Application
 Name=Legion Space
 GenericName=Lenovo Legion Hardware Control Suite
 Comment=Control thermal power profiles, cooling fans, battery conservation, and 4-zone RGB lighting
-Exec=/home/aayam422h/.local/bin/legionspace
+Exec=legionspace
 Icon=legion-space
 Terminal=false
 Categories=System;Settings;HardwareSettings;
 StartupNotify=true
 StartupWMClass=legionspace
 Keywords=lenovo;legion;fans;thermal;rgb;battery;overclock;
-

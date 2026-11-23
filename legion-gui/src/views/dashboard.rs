@@ -12,7 +12,7 @@ use crate::widgets::{m3_ring_gauge, m3_switch};
 
 pub fn render_dashboard(
     ui: &mut egui::Ui,
-    state: &AppStateSnapshot,
+    state: &mut AppStateSnapshot,
     notify: &mut impl FnMut(String),
 ) {
     // ==============================================================================
@@ -421,6 +421,7 @@ pub fn render_dashboard(
 
             if let Some(target) = switch_gpu {
                 if let Ok(updated) = gpu_modes::set_gpu_working_mode(target) {
+                    state.gpu_mode = updated.clone();
                     notify(format!("Switched GPU Mode to {}", updated.active_mode));
                 }
             }
